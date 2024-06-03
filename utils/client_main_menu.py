@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from database import orm_client_query as client_orm
+from database import orm_admin_query as admin_orm
 
 from kbds.callback import get_callback_btns
 
@@ -21,28 +22,27 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
     today = date.today()
     current_date = today - timedelta(days=(today.weekday()))
     last_date = current_date + timedelta(days=28)
-    text = f'🗓 Выберите удобную дату в этом интерактивном календаре \n📲 Или запишитесь по телефону: +79275108020 (9:00-18:00)\n\n🔴 - день полность расписан\n🟠 - высокая загрузка\n🟡 - средняя загрузка\n🟢 - свободно не менее 5 часов\n\n🏪 Адрес <b>Автосклад34</b>: Волжский, проспект им Ленина, 92а.\n\n⬇️ Актуальное расписание'
+    text = f'🗓 Выберите удобную дату в этом интерактивном календаре \n📲 Или запишитесь по телефону: +78443210102 (9:00-18:00)\n\n🔴 - день полность расписан\n🟠 - высокая загрузка\n🟡 - средняя загрузка\n🟢 - свободно не менее 5 часов\n\n🏪 Адрес <b>Автосклад34</b>: Волжский, проспект им Ленина, 92а.\n\n⬇️ Актуальное расписание'
     for _ in range(7):
         calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
     while current_date < last_date:
         if current_date < today:
             calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
         else:
-            orders_data = await client_orm.orm_get_order_with_date(session, current_date)
-            if (orders_data or current_date==today) and 'Выходной' not in {order.description for order in orders_data}:
-                closed_hours_set = {time for time in ' '.join([order.hours for order in orders_data]).split() if int(time) > 8 and int(time) < 18}
-                if current_date == today: closed_hours_set = closed_hours_set.union({i for i in range(9, int(datetime.now().hour)+1) if i < 18})
-                closed_hours_count = len(set(closed_hours_set)) 
-                if closed_hours_count < 3: inline_smile = '🟢'
-                elif closed_hours_count < 6: inline_smile = '🟡'
-                elif closed_hours_count < 9: inline_smile = '🟠'
+            orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
+            if orders_data and 'Выходной' not in {order.description for order in orders_data}:
+                hours = 0
+                for order in orders_data:
+                    hours += (order.ends - order.begins).total_seconds() // 3600
+                if hours < 4: inline_smile = '🟢'
+                elif hours < 9: inline_smile = '🟡'
+                elif hours < 17: inline_smile = '🟠'
                 else: inline_smile = '🔴'
                 text_button = f"{current_date.strftime('%d')}{inline_smile}"
-            elif orders_data and 'Выходной' in {order.description for order in orders_data}:
-                text_button = f"{current_date.strftime('%d')}🔴"
             else: text_button = f"{current_date.strftime('%d')}🟢"
-            calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = text_button
+        calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = text_button
         current_date += timedelta(days=1)
+
     calendar_data[f"main_menu_client"] = '🏠 Вернуться в главное меню 🏠'
     if trigger == 'cancel':
         main_client_kb = await message.answer(text=f'Все сброшено 👌\n\n{text}', reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)

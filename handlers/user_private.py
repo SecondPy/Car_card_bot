@@ -38,7 +38,7 @@ class SendOrder(StatesGroup):
 
 
 async def main_menu_client_constructor(session: AsyncSession, tg_id: int) -> list:
-    text = f'🏪 Адрес <b>Автосклад34</b>: Волжский, проспект им Ленина, 92а.\n📱 Тел: +79275108020 (9:00-18:00)\n'
+    text = f'🛢 Адрес <b>ОйлЦентр</b>: Волжский, пл. Труда, 4а.\n📱 Тел: +78443210102 (9:00-18:00)\n'
     btns_data, sizes = dict(), list()
     btns_data['header withoud_data'] = '⬇️ Выберите действие ⬇️'
     sizes.append(1)

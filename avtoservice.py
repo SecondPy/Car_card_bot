@@ -36,7 +36,7 @@ dp.include_routers(admin_private_router, client_private_router)
 async def start_utils() -> list[int]:
     date_finished_orders = datetime(1900, 1, 1).date()
     while True:
-        await asyncio.sleep(1)
+        await asyncio.sleep(5)
         if bot.admin_idle_timer:
             for id_admin in bot.admin_idle_timer.keys():
                 bot.admin_idle_timer[id_admin] += 1

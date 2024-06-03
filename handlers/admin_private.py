@@ -43,46 +43,20 @@ class FSMAdminFinishOrder(StatesGroup):
 async def new_order_menu_constructor(session: AsyncSession, data: dict) -> tuple:
     #(text, buttons_data, sizes)
     answer_text = f"-🤖 Собираю данные для наряда на <b>{data['message_date']}:</b>\n\n"
-    #нулевое состояние - начало создания ордера
-    if not 'client' in data and ' ' not in data['hours'] and 'description' not in data:
-        answer_text += f"-🕰 Время начала <b>{data['hours']}:00</b>\n\n🤖 ожидаю описание"
-    # есть описание но нет клиента и нет времени
-    elif not 'client' in data and ' ' not in data['hours'] and 'description' in data:
-        answer_text += f"-🕰 Время начала <b>{data['hours']}:00</b>\n"
-        answer_text += f"-📝 Описание есть: <b>{data['description']}</b>\n"
-    # есть время но нет описания и клиента
-    elif not 'client' in data and ' ' in data['hours'] and 'description' not in data:
-         answer_text += f"-🕰 Начало в <b>{data['hours'].split()[0]}:00. Машина будет готова к {data['last_hour']}:00</b>\n\n🤖 ожидаю описание"
-    # нет времени, но есть клиент/описание
-    elif 'client' in data and ' ' not in data['hours'] and 'description' in data:
-        answer_text += f"-🕰 Время начала <b>{data['hours']}:00</b>\n"
-        answer_text += f"-📝Описание есть: <b>{data['description']}</b>"
-        if data['client']:
-            client_message_data = f"к клиенту с тел: <b>+7{data['client'].phone_client}</b>"
-        else: client_message_data = f"к клиенту с tg_id: <b>{data['client'].id_telegram}</b>"
-        answer_text += f"\n-{random.choice(CLIENT_EMOJI)} наряд будет привязан {client_message_data}"
-    # есть и время и описание но нет клиента
-    elif not 'client' in data and ' ' in data['hours'] and 'description' in data:
-        answer_text += f"-🕰 <b>Начало в {data['hours'].split()[0]}:00. Машина будет готова к {data['last_hour']}:00</b>\n"
-        answer_text += f"-📝Описание есть: <b>{data['description']}</b>\n"
-    # есть время, описание и клиент
-    elif 'client' in data and ' ' in data['hours'] and 'description' in data:
-        answer_text = f"-🕰 Начало в <b>{data['hours'].split()[0]}:00. Машина будет готова к {data['last_hour']}:00</b>\n"
-        answer_text += f"-📝Описание есть: <b>{data['description']}</b>"
-        if data['client']:
-            client_message_data = f"к клиенту с тел: <b>+7{data['client'].phone_client}</b>"
-        else: client_message_data = f"к клиенту с tg_id: <b>{data['client'].id_telegram}</b>"
-        answer_text += f"\n-{random.choice(CLIENT_EMOJI)} наряд будет привязан {client_message_data}"
-
-
+    answer_text += f"-🕰 Начало в <b>{data['begins'].hour}:00</b>. Машина будет готова к <b>{data['ends'].hour}:00</b>\n"
+    if 'client' in data: answer_text += f"\n-{random.choice(CLIENT_EMOJI)} наряд будет привязан к клиенту: <b>+7{data['client'].phone_client or data['client'].id_telegram}</b>"
+    if 'description' in data: answer_text += f"\n-📝Описание есть: <b>{data['description']}</b>\n"
+    else: answer_text += '\n\n🤖 ожидаю описание'
     new_order_buttons, sizes = dict(), list()
-    if data['hours'] != '20' and ' ' not in data['hours']:
-        time_callback = int(data['hours'].split()[0])
-        for _ in range(2, 22-time_callback):
-            hours = 'часа' if _ < 5 else 'часов'
-            orders_data = await admin_orm.orm_get_order_with_date(session, data['begins'])
-            orders_hours = set(' '.join([order.hours for order in orders_data]).split())
-            if str(_+time_callback-1) in orders_hours: new_order_buttons[f'new_order_duration {_}'] = f'💢 {_} {hours}'
+    if data['begins'].hour < 17:
+        #time_callback = int(data['hours'].split()[0])
+        hour_delta_start = 2 if (data['ends']-data['begins']).total_seconds() == 3600 else 1
+        work_day_ends = 19
+        for _ in range(hour_delta_start, work_day_ends-data['begins'].hour):
+            if _ == 1: hours = 'час'
+            else: hours = 'часа' if _ < 5 else 'часов'
+            orders_data = await admin_orm.orm_get_order_with_date_time_and_place(session, data['begins']+timedelta(hours=_-1), place=data['place'])
+            if orders_data: new_order_buttons[f'new_order_duration {_}'] = f'💢 {_} {hours}'
             else: new_order_buttons[f'new_order_duration {_}'] = f'⏳ {_} {hours}'
         if len(new_order_buttons) % 3 == 2: sizes = [3]*(len(new_order_buttons)//3) + [2]
         elif len(new_order_buttons) % 3 == 1: sizes = [3]*(len(new_order_buttons)//3) + [1]
@@ -93,9 +67,13 @@ async def new_order_menu_constructor(session: AsyncSession, data: dict) -> tuple
             new_order_buttons[f"show_admin_history {' '.join([str(order.id_order) for order in orders_history])}"] = f'📖 показать историю 📖 ({len(orders_history)})'
             sizes.append(1)
 
-    new_order_buttons[f"cancel {data['begins']}"] = '❎ отмена ❎'
-    new_order_buttons[f'push_new_order'] = '✅ Создать наряд ✅'
-    sizes.append(2)
+    if data['state_order'] == 'create_new_order':
+        new_order_buttons[f"cancel {datetime.strftime(data['begins'], '%Y-%m-%d')}"] = '❎ отмена ❎'
+        new_order_buttons[f'push_new_order'] = '✅ Создать наряд ✅'
+        sizes.append(2)
+    elif data['state_order'] == 'update_order':
+        str_day_time = datetime.strftime(data['order_data'].begins, '%H')
+        new_order_buttons[f"busy_time {data['order_data'].id_order} {str_day_time} {data['order_data'].place}"] = '✅ готово ✅'
 
     return [answer_text, new_order_buttons, sizes]
 
@@ -116,6 +94,7 @@ async def edit_order_menu_constructor(session: AsyncSession, id_order: int, call
     description = order_data.description or 'не добавлялось'
     if callback == 'add_photo': answer_text = f"<b>-📸Фото успешно добавлено</b>\n\n-📃Описание: {description}\n"
     else: answer_text = f"-📃Описание: <b>{description}</b>\n"
+    answer_text += f"-🕰 Начало в <b>{order_data.begins.hour}:00</b>. Машина будет готова к <b>{order_data.ends.hour}:00</b>\n"
 
     if order_data.id_client:
         client = await admin_orm.get_client_with_id(session, order_data.id_client)
@@ -147,7 +126,6 @@ async def edit_order_menu_constructor(session: AsyncSession, id_order: int, call
             btn_inline_services[tab][''.join(btn_inline_services[tab].keys())] = f"✅ {''.join((btn_inline_services[tab].values()))}"
 
     
-    
     # Текстом: рекомендации, пробег, телефон, авто
     if callback not in 'advice mileage phone car':
         if order_data.repair_photo and order_data.repair_photo != ' ':
@@ -172,10 +150,9 @@ async def edit_order_menu_constructor(session: AsyncSession, id_order: int, call
         btns_data[f"calling_nothing manage_order"] = '👨‍💼____________    ⬇Навигация и управлениe⬇    ___________👨‍💼'
         sizes.append(1)
         
-        start_time = order_data.hours.split()
-        start_time = start_time[0]
-        btns_data[f"get_admin_time {order_data.begins} {start_time}"] = f"❗️ Записать новый поверх выбранного ❗️"
-        sizes.append(1)
+        btns_data[f'chose_duration'] = '⏳ длительность ⏳'
+        btns_data[f"get_admin_time {order_data.begins.strftime('%Y-%m-%d-%H')} {order_data.place}"] = f"❗️ Записать поверх ❗️"
+        sizes.append(2)
 
         btns_data[f'finish_order {id_order}'] = '✅ Завершить наряд ✅'
         btns_data[f'delete_order {id_order} {order_data.begins}'] = '🙅🏼 Удалить запись🙅🏼 '
@@ -221,7 +198,7 @@ async def cancel_handler(callback: types.CallbackQuery, state: FSMContext, bot: 
     bot.admin_idle_timer[callback.message.from_user.id] = 0
     
     await state.clear()
-    open_day = datetime.strptime(callback.data[7:], '%Y-%m-%d').date()
+    open_day = datetime.strptime(callback.data[7:], '%Y-%m-%d')
     await get_admin_day_timetable(callback.message, state, bot, session, open_day, message_text='Наряд сброшен 👌 Записать на другое время?')
     
 
@@ -259,12 +236,12 @@ async def get_admin_daytimes(callback: types.CallbackQuery, state: FSMContext, b
     bot.admin_idle_timer[callback.message.from_user.id] = 0
 
     callback_data = callback.data.split()
-    if len(callback_data) > 2: 
-        client_request = await admin_orm.get_client_request_with_id(session, int(callback_data[2]))
+    if len(callback_data) > 3: 
+        client_request = await admin_orm.get_client_request_with_id(session, int(callback_data[3]))
         client = await admin_orm.get_client_with_tg_id(session, client_request.id_telegram)
         await state.update_data(client_request=client_request, client=client, description=client_request.text_request, delete_client_message_id=callback_data[3])
 
-    chosen_day = datetime.strptime(callback.data.split()[1], '%Y-%m-%d').date()
+    chosen_day = datetime.strptime(callback.data.split()[1], '%Y-%m-%d')
     await get_admin_day_timetable(callback.message, state, bot, session, chosen_day)
 
 
@@ -273,7 +250,7 @@ async def weekends(callback: types.CallbackQuery, state: FSMContext, bot: Bot, s
     bot.admin_idle_timer[callback.message.from_user.id] = 0
     
     callback_data = callback.data.split()
-    callback_day = datetime.strptime(callback_data[1], '%Y-%m-%d').date()
+    callback_day = datetime.strptime(callback_data[1], '%Y-%m-%d')
     
     if 'cancel' in callback_data[0]:
         callback_id_order = int(callback_data[2])
@@ -289,16 +266,19 @@ async def add_new_order(callback: types.CallbackQuery, state: FSMContext, bot: B
 
     callback_data = callback.data.split()   # Получаем данные кнопки
     message = callback.message  # Для упрощения кода создаем переменную с объектом message
-    date_callback, time_callback = datetime.strptime(callback_data[1], '%Y-%m-%d'), callback_data[2] # Дата в формате DateTime, время в str
-    message_date_callback = DateFormatter(date_callback).message_format    # форматируем дату в человекояз
-    order_begins = datetime.strptime(callback_data[1], '%Y-%m-%d').date()
+    date_time_callback = datetime.strptime(callback_data[1], '%Y-%m-%d-%H') # Дата в формате DateTime
+    message_date_callback_message_format = DateFormatter(date_time_callback).message_format    # форматируем дату в человекояз
+    order_place = int(callback_data[2])
+    print(f'\n\norder_place={order_place}\n\n')
     
 
     await state.update_data(
-        begins=order_begins,
-        hours=time_callback,                         # Надо подготовить ячейку заранее, чтобы в будущем сработало условие description = description or 'без описания'
-        message_id=str(message.message_id),
-        message_date=message_date_callback
+        begins=date_time_callback,
+        ends=date_time_callback+timedelta(hours=1),
+        place=order_place,
+        message_date=message_date_callback_message_format,
+        message_id=message.message_id,
+        state_order='create_new_order'
     )
     
     context_data = await state.get_data()
@@ -337,17 +317,21 @@ async def get_new_order_data(message: types.Message, bot: Bot, state: FSMContext
     await message.delete()
 
 
-@admin_private_router.callback_query(FSMAdminNewOrder.get_new_order_data, F.data.startswith('new_order_duration'))
+@admin_private_router.callback_query(F.data.startswith('new_order_duration'))
 async def get_new_order_hours(callback: types.CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession):
     bot.admin_idle_timer[callback.message.from_user.id] = 0
     
     order_duration = int(callback.data.split()[1])
     context_data = await state.get_data()
-    time_start_order = int(context_data['hours'])
-    times_new_order = ' '.join([str(time_start_order+i) for i in range(order_duration)])
-    last_hour = time_start_order+order_duration
-    await state.update_data(hours=times_new_order, last_hour=last_hour)
+    if context_data['state_order'] == 'create_new_order': 
+        order_ends = context_data['begins'] + timedelta(hours=order_duration)
+        await state.update_data(ends=order_ends)
+        
+    elif context_data['state_order'] == 'update_order': 
+        context_data['order_data'].ends = context_data['order_data'].begins + timedelta(hours=order_duration)
+        await admin_orm.change_order_duration(session, context_data)
     
+
     context_data = await state.get_data()
     inline_message_id = context_data['message_id']
     answer_text, btns_data, sizes = await new_order_menu_constructor(session, context_data)
@@ -396,12 +380,12 @@ async def push_new_order(callback: types.CallbackQuery, state: FSMContext, bot: 
         await bot.delete_message(callback.from_user.id, callback.message.message_id)
         await state.clear()   
     
+    
     else: 
         await state.clear()
-        await get_admin_day_timetable(callback.message, state, bot, session, context_data['begins'], '✅ Наряд успешно добавлен')
+        day = context_data['begins'] - timedelta(hours=context_data['begins'].hour)
+        await get_admin_day_timetable(callback.message, state, bot, session, day, '✅ Наряд успешно добавлен')
     
-    
-
 
 
 @admin_private_router.callback_query(F.data.startswith('show_admin_history'))
@@ -436,7 +420,7 @@ async def edit_selected_order(callback: types.CallbackQuery, state: FSMContext, 
 
     callback_data = callback.data.split()
 
-    ids_orders = [int(id) for id in callback_data[2:]]
+    ids_orders = [int(id) for id in callback_data[1:]]
     btns_data, sizes = dict(), list()
     answer_text = '-🤖<b>Выбери для редактирования</b>:'
     for id_order in ids_orders:
@@ -450,17 +434,24 @@ async def edit_selected_order(callback: types.CallbackQuery, state: FSMContext, 
     await bot.edit_message_text(chat_id=callback.from_user.id, message_id=callback.message.message_id, text=answer_text, parse_mode=ParseMode.HTML)
     await bot.edit_message_reply_markup(chat_id=callback.from_user.id, message_id=callback.message.message_id, reply_markup=get_callback_btns(btns=btns_data, sizes=sizes))
 
-    # btn_data[f"many_busy_time {' '.join([str(order.id_order) for order in chosen_day_orders])}"] = f"🔧 {len(current_time_orders)} наряда 🔧"
 
 @admin_private_router.callback_query(F.data.startswith('busy_time'))
 async def edit_selected_order(callback: types.CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession):
     bot.admin_idle_timer[callback.message.from_user.id] = 0
 
-    await state.update_data(message_id=callback.message.message_id)
+
+    await state.update_data(message_id=callback.message.message_id, state_order='update_order')
     callback_data = callback.data.split()
     id_order = int(callback_data[1])
     order_data = await admin_orm.orm_get_order_with_id(session, id_order)
-    await state.update_data(order_data=order_data)
+    message_date = DateFormatter(order_data.begins).message_format
+    await state.update_data(
+        order_data=order_data,
+        place=order_data.place,
+        begins=order_data.begins,
+        ends=order_data.ends,
+        message_date=message_date
+    )
 
     answer_text, btns_data, sizes = await edit_order_menu_constructor(session, id_order, callback_data[2], state)
 
@@ -468,6 +459,16 @@ async def edit_selected_order(callback: types.CallbackQuery, state: FSMContext, 
     await bot.edit_message_reply_markup(chat_id=callback.from_user.id, message_id=callback.message.message_id, reply_markup=get_callback_btns(btns=btns_data, sizes=sizes))
     
     await state.set_state(FSMAdminFinishOrder.finish_order)
+
+
+@admin_private_router.callback_query(F.data.startswith('chose_duration'))
+async def edit_order_duration(callback: types.CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession):
+    message = callback.message
+    context_data = await state.update_data()
+    answer_text, btns_data, sizes = await new_order_menu_constructor(session, context_data)
+    await state.set_state(FSMAdminNewOrder.get_new_order_data)
+    await message.edit_text(text=answer_text, parse_mode=ParseMode.HTML)
+    await message.edit_reply_markup(reply_markup=get_callback_btns(btns=btns_data, sizes=sizes))
 
 
 @admin_private_router.callback_query(F.data.startswith('finish_order'))
@@ -481,7 +482,7 @@ async def push_edited_order(callback: types.CallbackQuery, state: FSMContext, bo
     if order_data.id_client:
         client = await admin_orm.get_client_with_id(session, order_data.id_client)
         if client.id_telegram:
-            await bot.send_message(client.id_telegram, text='Ваша машина готова. Подробности можно получить у мастера +79996244966 или менеджеров в магазине')
+            await bot.send_message(client.id_telegram, text='Ваша машина готова. Подробности узнать по телефону +78443210102')
             await callback.answer(text='👍 Клиент уведомлен о завершении наряда', show_alert=True)
 
     await admin_orm.finish_order_with_id(session, id_order)
@@ -499,10 +500,10 @@ async def edit_selected_order(message: types.Message, state: FSMContext, bot: Bo
     bot.admin_idle_timer[message.from_user.id] = 0
 
     context_data = await state.get_data()
+    order_data = context_data['order_data']
     
-    try: 
+    try:
         input = context_data['state']
-        order_data = context_data['order_data']
         match input:
             case 'advice': await admin_orm.push_new_advice(session, order_data.id_order, message.text)
             case 'mileage': await admin_orm.push_new_mileage(session, order_data.id_order, message.text)
@@ -513,14 +514,14 @@ async def edit_selected_order(message: types.Message, state: FSMContext, bot: Bo
                     message_answer = await message.answer('Не получается преобразовать в номер телефона, давай еще раз')
             case 'car':
                 message_answer = await message.answer('Функция находится в разработке')
-        
-        answer_text, btns_data, sizes = await edit_order_menu_constructor(session, order_data.id_order, 'None', state)
-    
-        await bot.edit_message_text(chat_id=message.from_user.id, message_id=context_data['message_id'], text=answer_text, parse_mode=ParseMode.HTML)
-        await bot.edit_message_reply_markup(chat_id=message.from_user.id, message_id=context_data['message_id'], reply_markup=get_callback_btns(btns=btns_data, sizes=sizes))
 
     except Exception as e:
-        message_answer = await message.answer('-🤖 Не могу никак интерпретировать данный ввод. Обратитесь к администратору')
+        await admin_orm.push_new_description(session, order_data.id_order, message.text)
+    
+
+    answer_text, btns_data, sizes = await edit_order_menu_constructor(session, order_data.id_order, 'None', state)
+    await bot.edit_message_text(chat_id=message.from_user.id, message_id=context_data['message_id'], text=answer_text, parse_mode=ParseMode.HTML)
+    await bot.edit_message_reply_markup(chat_id=message.from_user.id, message_id=context_data['message_id'], reply_markup=get_callback_btns(btns=btns_data, sizes=sizes))
         
 
     message_is_deleted = False
@@ -671,7 +672,7 @@ async def delete_selected_order(callback: types.CallbackQuery, state: FSMContext
     bot.admin_idle_timer[callback.message.from_user.id] = 0
 
     callback_data = callback.data.split()
-    id_order, date_order = int(callback_data[1]), datetime.strptime(callback_data[2], '%Y-%m-%d').date()
+    id_order, date_order = int(callback_data[1]), datetime.strptime(callback_data[2], '%Y-%m-%d')
 
     if await admin_orm.cancel_order_with_id(session, id_order) == 'success': answer_text = '☑️ Выбранная запись отменена'
     else: answer_text = 'Ошибка при отмене записи, админ уже в курсе (сукабля)' ##################### Добавить отправку отчета МНЕ

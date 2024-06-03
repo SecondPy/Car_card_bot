@@ -4,7 +4,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from database.models import AdminIds, Client, Day, Order, ClientMenu, ClientRequest
+from database.models import AdminIds, Client, Order, ClientMenu, ClientRequest
 
 
 async def orm_add_inline_message_id(session: AsyncSession, tg_id: int, inline_message_id: str):

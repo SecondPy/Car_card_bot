@@ -2,7 +2,7 @@ import asyncio
 from aiogram import Bot, F, types, Router
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from utils.admin_main_menu import get_main_admin_menu
 
 
@@ -16,7 +16,7 @@ from utils.datetime_formatter import DateFormatter
 from kbds.callback import get_callback_btns
 
 
-async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot: Bot, session: AsyncSession, chosen_day: date, message_text='', client_tg_id=None):
+async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot: Bot, session: AsyncSession, chosen_day: datetime, message_text='', client_tg_id=None):
     
     context_data = await state.get_data()
     if 'client_request' in context_data:
@@ -33,36 +33,35 @@ async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot
 
 
     btn_data, sizes = dict(), list()
-    start_time = datetime.strptime('07:00', '%H:%M')
-    
-    today = datetime.today().date()
-    if chosen_day < today:
+    working_hour = chosen_day + timedelta(hours=9)
+    work_day_ending = chosen_day + timedelta(hours=18)
+
+    if chosen_day.date() < datetime.today().date():
         orders_data = await admin_orm.orm_get_order_with_date(session, chosen_day, 'finished')
         message_text += f'\n📆 Открываю <b>историю</b> за {DateFormatter(chosen_day).message_format}\n'
     else:
         message_text += f'\n📆 <b>{DateFormatter(chosen_day).message_format}</b>\n'
-        orders_data = await admin_orm.orm_get_order_with_date(session, chosen_day)
+        orders_data = await admin_orm.orm_get_order_with_date(session, working_hour)
         is_weekend = [order.id_order for order in orders_data if order.description=='Выходной']
         if is_weekend: btn_data[f"weekend_cancel {chosen_day} {is_weekend[0]}"] = "🧑🏼‍🏭 отменить выходной 🧑🏼‍🏭"
         else: btn_data[f"weekend {chosen_day}"] = "🥳 сделать выходным 🥳"
         sizes.append(1)
 
-    while start_time < datetime.strptime('21:00', '%H:%M'):
-        str_start_time = datetime.strftime(start_time, '%H')
-        int_start_time = int(str_start_time)
-        current_time_orders = [order for order in orders_data if int_start_time in [int(hour) for hour in order.hours.split()]]
-        try: print(f'\n\n int_start_time = {int_start_time}, order.hours = {current_time_orders[0].hours}\n\n')
-        except: pass
-        if len(current_time_orders) > 1:
-            btn_data[f"many_busy_time {str_start_time} {' '.join([str(order.id_order) for order in orders_data])}"] = f"🔧 {len(current_time_orders)} наряда 🔧"
-        elif current_time_orders:
-            description = current_time_orders[0].description or 'без описания'
-            btn_data[f"busy_time {current_time_orders[0].id_order} {str_start_time}"] = f"🔧 {description} 🔧"
-        else:
-            btn_data[f"get_admin_time {chosen_day.strftime('%Y-%m-%d')} {datetime.strftime(start_time, '%H')}"] = f"{start_time.strftime('%H:%M')}"
+    while working_hour < work_day_ending:
+        str_day_time = datetime.strftime(working_hour, '%H')
+        current_time_orders_place_1 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 1)
+        current_time_orders_place_2 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 2)
+        for place_num, place_data in enumerate([current_time_orders_place_1, current_time_orders_place_2]):
+            if len(place_data) > 1:
+                btn_data[f"many_busy_time {' '.join([str(order.id_order) for order in place_data])}"] = f"🔧 {len(place_data)} наряда 🔧"
+            elif place_data:
+                description = place_data[0].description or 'без описания'
+                btn_data[f"busy_time {place_data[0].id_order} {str_day_time} {place_num+1}"] = f"🔧 {description} 🔧"
+            else:
+                btn_data[f"get_admin_time {working_hour.strftime('%Y-%m-%d-%H')} {place_num+1}"] = f"{working_hour.strftime('%H:%M')}"
 
-        start_time += timedelta(hours=1)
-        sizes.append(1)
+        working_hour += timedelta(hours=1)
+        sizes.append(2)
     
     btn_data[f"get_day {(chosen_day-timedelta(days=1)).strftime('%Y-%m-%d')}"] = "⏪ Назад"
     btn_data[f"get_day {(chosen_day+timedelta(days=1)).strftime('%Y-%m-%d')}"] = "Вперед ⏩"

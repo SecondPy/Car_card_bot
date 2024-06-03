@@ -61,28 +61,6 @@ class ClientRequest(Base):
     text_request: Mapped[str] = mapped_column(Text)
 
 
-class Day(Base):
-    __tablename__ = 'days'
-    
-    id_day: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    date: Mapped[Date] = mapped_column(Date)
-    _06: Mapped[str] = mapped_column(Text)
-    _07: Mapped[str] = mapped_column(Text)
-    _08: Mapped[str] = mapped_column(Text)
-    _09: Mapped[str] = mapped_column(Text)
-    _10: Mapped[str] = mapped_column(Text)
-    _11: Mapped[str] = mapped_column(Text)
-    _12: Mapped[str] = mapped_column(Text)
-    _13: Mapped[str] = mapped_column(Text)
-    _14: Mapped[str] = mapped_column(Text)
-    _15: Mapped[str] = mapped_column(Text)
-    _16: Mapped[str] = mapped_column(Text)
-    _17: Mapped[str] = mapped_column(Text)
-    _18: Mapped[str] = mapped_column(Text)
-    _19: Mapped[str] = mapped_column(Text)
-    _20: Mapped[str] = mapped_column(Text)
-
-
 class Notice(Base):
     __tablename__ = 'notices'
 
@@ -98,10 +76,10 @@ class Notice(Base):
 class Order(Base):
     __tablename__ = 'orders'
 
-    
     id_order: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    begins: Mapped[Date] = mapped_column(Date)
-    hours: Mapped[str] = mapped_column(String(150), nullable=True)
+    begins: Mapped[DateTime] = mapped_column(DateTime)
+    ends: Mapped[DateTime] = mapped_column(DateTime)
+    place: Mapped[int] = mapped_column(Integer, nullable=True)
     id_car: Mapped[int] = mapped_column(Integer, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     longterm: Mapped[bool] = mapped_column(Boolean, nullable=True)

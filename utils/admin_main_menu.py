@@ -25,19 +25,17 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
     for _ in range(7):
         calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
     while current_date < last_date:
-        if current_date < date.today() or current_date>(date.today()+timedelta(days=28)):
+        if current_date < date.today() or current_date > (date.today()+timedelta(days=28)):
             calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
         else:
             orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
             if orders_data and 'Выходной' not in {order.description for order in orders_data}:
-                hours = []
+                hours = 0
                 for order in orders_data:
-                    if ' ' in order.hours: hours += order.hours.split()
-                    else: hours.append(order.hours)
-                hours_count = len(set(hours)) 
-                if hours_count < 3: inline_smile = '🟢'
-                elif hours_count < 6: inline_smile = '🟡'
-                elif hours_count < 10: inline_smile = '🟠'
+                    hours += (order.ends - order.begins).total_seconds() // 3600
+                if hours < 4: inline_smile = '🟢'
+                elif hours < 9: inline_smile = '🟡'
+                elif hours < 17: inline_smile = '🟠'
                 else: inline_smile = '🔴'
                 text_button = f"{current_date.strftime('%d')}{inline_smile}"
             elif orders_data and 'Выходной' in {order.description for order in orders_data}:

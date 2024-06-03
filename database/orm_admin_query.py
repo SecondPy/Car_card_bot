@@ -7,7 +7,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from database.models import AdminIds, AdminMenu, Client, ClientRequest, Day, Order
+from database.models import AdminIds, AdminMenu, Client, ClientRequest, Order
 
 
 async def orm_add_inline_message_id(session: AsyncSession, tg_id: int, inline_message_id: str):
@@ -93,12 +93,24 @@ async def get_client_with_tg_id(session: AsyncSession, tg_client: int):
     return client
 
 async def orm_get_order_with_date(session: AsyncSession, date: date, status='actual') -> str:
+    query = select(Order).where(Order.status==status).filter(Order.begins>=date, Order.begins<date+timedelta(days=1))
+    result = await session.execute(query)
+    return result.scalars().all()
+
+async def orm_get_order_with_date_and_place(session: AsyncSession, ask_date: datetime, place: int, status='actual') -> str:
     query = select(Order).where(
-        (Order.begins==date),
-        (Order.status==status)
+        (Order.begins==ask_date),
+        (Order.status==status),
+        (Order.place==place)
     )
     result = await session.execute(query)
     return result.scalars().all()
+
+async def orm_get_order_with_date_time_and_place(session: AsyncSession, date_time_order: datetime, place: int, status='actual'):
+    query = select(Order).where(Order.status==status, Order.place==place).filter(Order.begins<=date_time_order, Order.ends>date_time_order)
+    result = await session.execute(query)
+    return result.scalars().all()
+
 
 async def get_orders_with_client_id(session: AsyncSession, id_client: int, status='finished'):
     query = select(Order).where(Order.id_client==id_client, Order.status==status)
@@ -121,7 +133,6 @@ async def cancel_order_with_id(session: AsyncSession, id_order: int) -> str:
 async def orm_make_weekend(session:AsyncSession, date):
     order = Order(
         begins=date,
-        hours=('9 10 11 12 13 14 15 16 17'),
         description='Выходной',
         status='actual'
     )
@@ -148,12 +159,13 @@ async def push_new_order(session:AsyncSession, order_data):
     if 'client' in order_data: id_client = order_data['client'].id_client 
     else: id_client = 0
     today = datetime.today().date()
-    if order_data['begins'] < today: status = 'finished'
+    if order_data['begins'].date() < today: status = 'finished'
     else: status = 'actual'
     
     order = Order(
         begins=order_data['begins'],
-        hours=order_data['hours'],
+        ends=order_data['ends'],
+        place=order_data['place'],
         id_car=0,
         description=order_data['description'],
         status=status,
@@ -202,6 +214,11 @@ async def push_new_phone(session: AsyncSession, id_order: int, phone: str):
     await session.commit()
     return client
 
+async def push_new_description(session: AsyncSession, id_order :int, description: str):
+    query = update(Order).where(Order.id_order==id_order).values(description=description)
+    await session.execute(query)
+    await session.commit()
+
 
 async def finish_order_with_id(session: AsyncSession, id_order: int):
     query = update(Order).where(Order.id_order==id_order).values(status='finished')
@@ -238,6 +255,13 @@ async def delete_repair_photo(session: AsyncSession, id_order: int, clice_id_pho
     return 'success'
 
 
+async def change_order_duration(session:AsyncSession, context_data: dict):
+    query = update(Order).where(Order.id_order==context_data['order_data'].id_order).values(ends=context_data['order_data'].ends)
+    await session.execute(query)
+    await session.commit()
+
+
+
 async def add_admin_id(session: AsyncSession, tg_id: int):
     query = select(AdminIds.tg_id).where(AdminIds.tg_id==tg_id)
     result = await session.execute(query)
@@ -253,8 +277,6 @@ async def get_admins_ids(session: AsyncSession):
     result = await session.execute(query)
     ids = result.scalars().all()
     return ids
-
-
 
 async def finish_old_orders():
     session = session_maker()
