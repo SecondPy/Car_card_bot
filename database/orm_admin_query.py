@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy.orm import sessionmaker
 from database.engine import session_maker
@@ -106,6 +106,12 @@ async def orm_get_order_with_date_and_place(session: AsyncSession, ask_date: dat
     result = await session.execute(query)
     return result.scalars().all()
 
+async def orm_get_order_with_date_time(session: AsyncSession, date_time_order: datetime, status='actual'):
+    query = select(Order).where(Order.status==status).filter(Order.begins<=date_time_order, Order.ends>date_time_order)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
 async def orm_get_order_with_date_time_and_place(session: AsyncSession, date_time_order: datetime, place: int, status='actual'):
     query = select(Order).where(Order.status==status, Order.place==place).filter(Order.begins<=date_time_order, Order.ends>date_time_order)
     result = await session.execute(query)
@@ -131,8 +137,11 @@ async def cancel_order_with_id(session: AsyncSession, id_order: int) -> str:
 
 
 async def orm_make_weekend(session:AsyncSession, date):
+    begins, ends = datetime.combine(date, time(9, 0)), datetime.combine(date, time(18, 0))
     order = Order(
-        begins=date,
+        begins=begins,
+        ends=ends,
+        place=1,
         description='Выходной',
         status='actual'
     )

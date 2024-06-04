@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 import random
 
 from aiogram import Bot, F, types, Router
@@ -16,23 +16,26 @@ from kbds.callback import get_callback_btns
 
 
 
-async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot, message: types.Message, trigger, text='', today=date.today()) -> None:
+async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot, message: types.Message, trigger, text='', date_start=date.today()) -> None:
     calendar_data = {}
-    current_date = today - timedelta(days=(today.weekday()))
+    current_date = date_start - timedelta(days=(date_start.weekday()))
     last_date = current_date + timedelta(days=28)
     text += '⬇️ Актуальное расписание'
+    today = date.today()
 
     for _ in range(7):
         calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
     while current_date < last_date:
-        if current_date < date.today() or current_date > (date.today()+timedelta(days=28)):
+        if current_date < today or current_date > (today+timedelta(days=28)):
             calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
         else:
             orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
             if orders_data and 'Выходной' not in {order.description for order in orders_data}:
-                hours = 0
+                if current_date != today or datetime.now().hour < 9: hours = 0
+                else: hours = (datetime.now().hour - 9) * 2
                 for order in orders_data:
                     hours += (order.ends - order.begins).total_seconds() // 3600
+                print(f'\n\n\nhours={hours}\n\n\n')
                 if hours < 4: inline_smile = '🟢'
                 elif hours < 9: inline_smile = '🟡'
                 elif hours < 17: inline_smile = '🟠'
@@ -43,9 +46,9 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
             else: text_button = f"{current_date.strftime('%d')}🟢"
             calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = text_button
         current_date += timedelta(days=1)
-    calendar_data[f"flip_month {today} back"] = f'⏪ назад'
-    if today != date.today(): calendar_data[f"main_admin_menu"] = f'⏺'
-    calendar_data[f"flip_month {today} next"] = f'вперед ⏩'
+    calendar_data[f"flip_month {date_start} back"] = f'⏪ назад'
+    if date_start != today: calendar_data[f"main_admin_menu"] = f'⏺'
+    calendar_data[f"flip_month {date_start} next"] = f'вперед ⏩'
     if trigger == 'cancel':
         main_admin_kb = await message.answer(text=f'Все сброшено 👌\n\n{text}', reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
         bot.main_admin_menu_ids[message.from_user.id] = main_admin_kb.message_id

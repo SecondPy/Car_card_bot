@@ -33,36 +33,40 @@ async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot
 
 
     btn_data, sizes = dict(), list()
-    working_hour = chosen_day + timedelta(hours=9)
-    work_day_ending = chosen_day + timedelta(hours=18)
+    working_hour = chosen_day.replace(hour=9)
+    work_day_ending = chosen_day.replace(hour=18)
 
-    if chosen_day.date() < datetime.today().date():
-        orders_data = await admin_orm.orm_get_order_with_date(session, chosen_day, 'finished')
-        message_text += f'\n📆 Открываю <b>историю</b> за {DateFormatter(chosen_day).message_format}\n'
+    if chosen_day.date() < datetime.today().date(): ask_orders_status = 'finished'
+    else: ask_orders_status = 'actual'
+        
+    message_text += f'\n📆 <b>{DateFormatter(chosen_day).message_format}</b>\n'
+    orders_data = await admin_orm.orm_get_order_with_date_time(session, working_hour)
+    is_weekend = [order.id_order for order in orders_data if order.description=='Выходной']
+    if is_weekend:
+        message_text += '🥳 День помечен как выходной 🥳'
+        btn_data[f"weekend_cancel {chosen_day.date()} {is_weekend[0]}"] = "🧑🏼‍🏭 отменить выходной 🧑🏼‍🏭"
+        sizes.append(1)
     else:
-        message_text += f'\n📆 <b>{DateFormatter(chosen_day).message_format}</b>\n'
-        orders_data = await admin_orm.orm_get_order_with_date(session, working_hour)
-        is_weekend = [order.id_order for order in orders_data if order.description=='Выходной']
-        if is_weekend: btn_data[f"weekend_cancel {chosen_day} {is_weekend[0]}"] = "🧑🏼‍🏭 отменить выходной 🧑🏼‍🏭"
-        else: btn_data[f"weekend {chosen_day}"] = "🥳 сделать выходным 🥳"
+        btn_data[f"weekend {chosen_day}"] = "🥳 сделать выходным 🥳"
         sizes.append(1)
 
-    while working_hour < work_day_ending:
-        str_day_time = datetime.strftime(working_hour, '%H')
-        current_time_orders_place_1 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 1)
-        current_time_orders_place_2 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 2)
-        for place_num, place_data in enumerate([current_time_orders_place_1, current_time_orders_place_2]):
-            if len(place_data) > 1:
-                btn_data[f"many_busy_time {' '.join([str(order.id_order) for order in place_data])}"] = f"🔧 {len(place_data)} наряда 🔧"
-            elif place_data:
-                description = place_data[0].description or 'без описания'
-                btn_data[f"busy_time {place_data[0].id_order} {str_day_time} {place_num+1}"] = f"🔧 {description} 🔧"
-            else:
-                btn_data[f"get_admin_time {working_hour.strftime('%Y-%m-%d-%H')} {place_num+1}"] = f"{working_hour.strftime('%H:%M')}"
+        while working_hour < work_day_ending:
+            str_day_time = datetime.strftime(working_hour, '%H')
+            current_time_orders_place_1 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 1, status=ask_orders_status)
+            current_time_orders_place_2 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 2, status=ask_orders_status)
+            for place_num, place_data in enumerate([current_time_orders_place_1, current_time_orders_place_2]):
+                if len(place_data) > 1:
+                    btn_data[f"many_busy_time {' '.join([str(order.id_order) for order in place_data])}"] = f"🔧 {len(place_data)} наряда 🔧"
+                elif place_data:
+                    description = place_data[0].description or 'без описания'
+                    btn_data[f"busy_time {place_data[0].id_order} {str_day_time} {place_num+1}"] = f"🔧 {description} 🔧"
+                else:
+                    btn_data[f"get_admin_time {working_hour.strftime('%Y-%m-%d-%H')} {place_num+1}"] = f"{working_hour.strftime('%H:%M')}"
 
-        working_hour += timedelta(hours=1)
-        sizes.append(2)
+            working_hour += timedelta(hours=1)
+            sizes.append(2)
     
+
     btn_data[f"get_day {(chosen_day-timedelta(days=1)).strftime('%Y-%m-%d')}"] = "⏪ Назад"
     btn_data[f"get_day {(chosen_day+timedelta(days=1)).strftime('%Y-%m-%d')}"] = "Вперед ⏩"
     sizes.append(2)

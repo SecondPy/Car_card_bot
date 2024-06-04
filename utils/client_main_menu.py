@@ -22,12 +22,13 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
     today = date.today()
     current_date = today - timedelta(days=(today.weekday()))
     last_date = current_date + timedelta(days=28)
-    text = f'🗓 Выберите удобную дату в этом интерактивном календаре \n📲 Или запишитесь по телефону: +78443210102 (9:00-18:00)\n\n🔴 - день полность расписан\n🟠 - высокая загрузка\n🟡 - средняя загрузка\n🟢 - свободно не менее 5 часов\n\n🏪 Адрес <b>Автосклад34</b>: Волжский, проспект им Ленина, 92а.\n\n⬇️ Актуальное расписание'
+    text = f'🗓 Выберите удобную дату в этом интерактивном календаре \n📲 Или запишитесь по телефону: +78443210102 (9:00-18:00)\n\n🔴 - день полность расписан\n🟠 - высокая загрузка\n🟡 - средняя загрузка\n🟢 - свободно не менее 5 часов\n\n🛢 Адрес <b>ОйлЦентр</b>: Волжский, пл Труда, 4а.\n\n⬇️ Актуальное расписание'
     for _ in range(7):
         calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
     while current_date < last_date:
         if current_date < today:
             calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
+            text_button = f"{current_date.strftime('%d')}"
         else:
             orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
             if orders_data and 'Выходной' not in {order.description for order in orders_data}:

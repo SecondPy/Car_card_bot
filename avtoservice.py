@@ -22,7 +22,8 @@ ALLOWED_UPDATES = ['message, edited_message']
 
 # 6191676658:AAG65LUtn8c7kvpmUNbiuvC-8Qmi9J9H24o - avtoservice_34
 # 6506294620:AAGbP2Bi8VKLSC0UCobcFRKOE3SnxUVD2-k чайная
-bot = Bot(token='6191676658:AAG65LUtn8c7kvpmUNbiuvC-8Qmi9J9H24o')
+# 2102094577:AAHKWVSqsvbU86GC0yvH2CGIZ7s9xY_kp2c - carcardbot
+bot = Bot(token='2102094577:AAHKWVSqsvbU86GC0yvH2CGIZ7s9xY_kp2c')
 bot.admins_list = [] # 2136465129 - мой 9965109078
 
 bot.admin_idle_timer, bot.client_idle_timer = dict(), dict()

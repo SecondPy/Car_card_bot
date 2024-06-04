@@ -31,11 +31,10 @@ async def show_client_order(session: AsyncSession, state: FSMContext, bot: Bot, 
     ]
 
     btns_data, sizes = dict(), list()
-
+    
     if order.mileage: answer_text += f'\n-🏃🏼‍♂️ <b>Пробег</b>: {order.mileage}\n'
     if order.advice: answer_text += f'-🗣 <b>рекомендации</b>: {order.advice}\n\n'
     
-    answer_text = answer_text or 'Никакой дополнительной информации добавлено не было'
 
     if {service for service in services if service}:
         answer_text += '\n<b>Заменили:</b>\n'
@@ -48,7 +47,7 @@ async def show_client_order(session: AsyncSession, state: FSMContext, bot: Bot, 
         btns_data[f"show_client_repair_photo {order.id_order} {count_images}"] = f"📷 Показать добавленные фото({count_images}) 📷"
         sizes.append(1)
 
-    answer_text = answer_text or '🤷‍♂️ Никакой информации по наряду внесено не было. Обратитесь в магазин за подробностями'
+    if answer_text == 'В истории пока только 1 наряд': answer_text += '\n🤷‍♂️ Никакой информации по нему внесено не было. Обратитесь в сервис за подробностями +78443210102'
     btns_data[f"main_menu_client"] = '🏠 Вернуться в главное меню 🏠'
     sizes.append(1)
 

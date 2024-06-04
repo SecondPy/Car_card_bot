@@ -216,7 +216,7 @@ async def get_admins_powers(message: types.Message, state: FSMContext, bot: Bot,
 async def show_calendar_by_callback(callback: types.CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession):
     bot.admin_idle_timer[callback.message.from_user.id] = 0
     
-    await get_main_admin_menu(session=session, state=state, bot=bot, message=callback.message, trigger='button', today=date.today())
+    await get_main_admin_menu(session=session, state=state, bot=bot, message=callback.message, trigger='button', date_start=date.today())
 
 
 @admin_private_router.callback_query(F.data.startswith('flip_month'))
@@ -228,7 +228,7 @@ async def show_calendar_by_callback(callback: types.CallbackQuery, state: FSMCon
     direction = callback_data[2]
     if direction =='back': date_start = date_start - timedelta(days=28)
     elif direction == 'next': date_start = date_start + timedelta(days=28)
-    await get_main_admin_menu(session=session, state=state, bot=bot, message=callback.message, trigger='button', today=date_start)
+    await get_main_admin_menu(session=session, state=state, bot=bot, message=callback.message, trigger='button', date_start=date_start)
 
 
 @admin_private_router.callback_query(F.data.startswith('get_day'))
@@ -236,8 +236,8 @@ async def get_admin_daytimes(callback: types.CallbackQuery, state: FSMContext, b
     bot.admin_idle_timer[callback.message.from_user.id] = 0
 
     callback_data = callback.data.split()
-    if len(callback_data) > 3: 
-        client_request = await admin_orm.get_client_request_with_id(session, int(callback_data[3]))
+    if len(callback_data) > 3:
+        client_request = await admin_orm.get_client_request_with_id(session, int(callback_data[2]))
         client = await admin_orm.get_client_with_tg_id(session, client_request.id_telegram)
         await state.update_data(client_request=client_request, client=client, description=client_request.text_request, delete_client_message_id=callback_data[3])
 
@@ -349,6 +349,7 @@ async def push_new_order(callback: types.CallbackQuery, state: FSMContext, bot: 
         await state.update_data(description='')
         context_data = await state.get_data()
 
+    if callback.from_user.id != 2136465129:
         await bot.send_message(
         chat_id=2136465129, 
         text=f"Добавлен новый ордер админом: {callback.from_user.id}\nОписание - {context_data['description'] or 'без описания'}\nНа {context_data['begins']}")
@@ -359,7 +360,7 @@ async def push_new_order(callback: types.CallbackQuery, state: FSMContext, bot: 
         client_tg_id = context_data['client_request'].id_telegram
         await bot.send_message(
             chat_id=client_tg_id, 
-            text=f"👌 мастер записал Вас на ремонт на {context_data['message_date']} {context_data['hours'].split()[0]}:00"
+            text=f"👌 мастер записал Вас на ремонт на {context_data['message_date']} {context_data['begins'].hour}:00"
         )
         text, btns_data, sizes = await main_menu_client_constructor(session, client_tg_id)
         await bot.edit_message_text(
@@ -444,6 +445,7 @@ async def edit_selected_order(callback: types.CallbackQuery, state: FSMContext, 
     callback_data = callback.data.split()
     id_order = int(callback_data[1])
     order_data = await admin_orm.orm_get_order_with_id(session, id_order)
+
     message_date = DateFormatter(order_data.begins).message_format
     await state.update_data(
         order_data=order_data,
@@ -482,16 +484,16 @@ async def push_edited_order(callback: types.CallbackQuery, state: FSMContext, bo
     if order_data.id_client:
         client = await admin_orm.get_client_with_id(session, order_data.id_client)
         if client.id_telegram:
-            await bot.send_message(client.id_telegram, text='Ваша машина готова. Подробности узнать по телефону +78443210102')
+            await bot.send_message(client.id_telegram, text='✅ Ваша машина готова. Подробности можно узнать по телефону +78443210102')
             await callback.answer(text='👍 Клиент уведомлен о завершении наряда', show_alert=True)
 
     await admin_orm.finish_order_with_id(session, id_order)
     context_data = await state.get_data()
     chosen_day = context_data['order_data'].begins
     
-    message_text = '-✅ <b>Выбранный заказ-наряд завершен успешно</b>'
+    await callback.answer('✅Наряд завершен успешно\nМесто свободно для записи', show_alert=True)
 
-    await get_admin_day_timetable(callback.message, state, bot, session, chosen_day, message_text)
+    await get_admin_day_timetable(callback.message, state, bot, session, chosen_day)
     await state.clear()
 
 
@@ -675,7 +677,11 @@ async def delete_selected_order(callback: types.CallbackQuery, state: FSMContext
     id_order, date_order = int(callback_data[1]), datetime.strptime(callback_data[2], '%Y-%m-%d')
 
     if await admin_orm.cancel_order_with_id(session, id_order) == 'success': answer_text = '☑️ Выбранная запись отменена'
-    else: answer_text = 'Ошибка при отмене записи, админ уже в курсе (сукабля)' ##################### Добавить отправку отчета МНЕ
+    else: 
+        answer_text = 'Ошибка при отмене записи, админ уже в курсе (сукабля)' ##################### Добавить отправку отчета МНЕ
+        await bot.send_message(
+        chat_id=2136465129, 
+        text=f"Ошибка при отмене записи {callback.from_user.id}")
     await get_admin_day_timetable(callback.message, state, bot, session, date_order, answer_text)
     await state.clear()
 

@@ -48,7 +48,7 @@ async def main_menu_client_constructor(session: AsyncSession, tg_id: int) -> lis
     actual_orders = await client_orm.find_orders_with_tg_id(session=session, tg_id=tg_id, status='actual')
     if actual_orders:
         for order in actual_orders:
-            text += f"\n-👨🏼‍🏭Ждём Вас на обслуживание {DateFormatter(order.begins).message_format} к {order.hours.split()[0]}:00"
+            text += f"\n-👨🏼‍🏭Ждём Вас на обслуживание {DateFormatter(order.begins).message_format}"
     else:
         text += f'\n-👨🏼‍🏭 записей о предстоящем обслуживании не найдено'
 
@@ -123,7 +123,7 @@ async def get_client_calendar(callback: types.CallbackQuery, state: FSMContext, 
         while not messege_is_deleted:
             await asyncio.sleep(20)
             try:
-                await bot.delete_message(chat_id=callback.from_user.id, message_id=message_to_delete.message_id)
+                await message_to_delete.delete()
                 messege_is_deleted = True
             except: messege_is_deleted = True
 
@@ -296,7 +296,7 @@ async def get_client_daytimes(callback: types.CallbackQuery, state: FSMContext, 
         from_user_id=callback.from_user.id,
         date_message=message_date_callback,
         time=time_callback,
-        message_delete=[message_to_delete.message_id],
+        message_delete=[message_to_delete.message_id, callback.message.message_id],
         client=client
     )
     
@@ -323,11 +323,10 @@ async def get_order_info(message: types.Message, session: AsyncSession, bot: Bot
         else: 
             message_delete = await message.answer(text=f"🤖Описание задачи есть: {context_data['description']}\n 🔎Но не нашел в нём номер телефона :(\nПожалуйста, напишите Ваш номер телефона, чтобы мы могли свзяться с Вами")
             await state.update_data(delete_message=context_data['message_delete'].append(message_delete.message_id))
-    print(f'\n\n\nbot.main_client_menu_ids = {bot.main_client_menu_ids}\n message.from_user.id = {message.from_user.id}\n message={message}\n\n\n')
     if context_data['client'].phone_client:
         client_message_data = f"+7{context_data['client'].phone_client}"
-        client_messege_id_to_delete = await message.answer(text='✅ Запрос отправлен успешно. Как только его подтвердят, Вам будет отправлено уведомление👌')
-        client_messege_id_to_delete = client_messege_id_to_delete.message_id
+        client_messege_to_delete = await message.answer(text=f"✅ Запрос на {context_data['date_message']} {context_data['time']}:00 с описанием '{context_data['description']}' отправлен успешно. Как только его подтвердят, Вам будет отправлено уведомление👌")
+        client_messege_id_to_delete = client_messege_to_delete.message_id
         btns_data[f"get_day {context_data['begins']} {request.id_request} {client_messege_id_to_delete}"] = '📝Открыть день и записать📝'
         admin_ids = await admin_orm.get_admins_ids(session)
         for id in admin_ids:
@@ -336,12 +335,10 @@ async def get_order_info(message: types.Message, session: AsyncSession, bot: Bot
                 text=f"-{random.choice(CLIENT_EMOJI)} Новый запрос на запись на {context_data['date_message']} {context_data['time']}:00\n-📱 Тел клиента: {client_message_data}\n-🗣 Запрос клиента: {context_data['description']}", 
                 reply_markup=get_callback_btns(btns=btns_data, sizes=sizes)
             )
+        await state.update_data(delete_message=context_data['message_delete'].append(message.message_id))
         context_data = await state.get_data()
         for message_to_delete in context_data['message_delete']:
             await bot.delete_message(chat_id=message.from_user.id, message_id=message_to_delete)
-
-        await bot.delete_message(chat_id=message.from_user.id, message_id=bot.main_client_menu_ids[message.from_user.id])
-        
         
         text, btns_data, sizes = await main_menu_client_constructor(session, message.from_user.id)
         main_message = await message.answer(text=text, reply_markup=get_callback_btns(btns=btns_data, sizes=sizes), parse_mode=ParseMode.HTML)
