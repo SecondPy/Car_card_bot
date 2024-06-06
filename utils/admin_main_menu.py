@@ -23,7 +23,7 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
     today = date.today()
     orders_data = await admin_orm.orm_get_order_with_date(session, datetime.combine(today, time(0, 0)))
     if orders_data:
-        text += 'Наряды на сегодня:\n-'
+        text += '🗓 Наряды на сегодня:\n-'
         text += '\n-'.join([(f"<b>{DateFormatter(order.begins).message_format[-5:]}</b> {order.description}") for order in orders_data])
     
     text += '\n\n⬇️ Актуальное расписание'
