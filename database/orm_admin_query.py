@@ -107,6 +107,7 @@ async def orm_get_order_with_date_and_place(session: AsyncSession, ask_date: dat
     return result.scalars().all()
 
 async def orm_get_order_with_date_time(session: AsyncSession, date_time_order: datetime, status='actual'):
+    if not session: session = session_maker()
     query = select(Order).where(Order.status==status).filter(Order.begins<=date_time_order, Order.ends>date_time_order)
     result = await session.execute(query)
     return result.scalars().all()
@@ -282,6 +283,7 @@ async def add_admin_id(session: AsyncSession, tg_id: int):
 
 
 async def get_admins_ids(session: AsyncSession):
+    if not session: session = session_maker()
     query = select(AdminIds.tg_id)
     result = await session.execute(query)
     ids = result.scalars().all()

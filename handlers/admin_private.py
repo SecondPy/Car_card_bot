@@ -192,6 +192,12 @@ async def cancel_handler(message: types.Message, state: FSMContext, bot: Bot, se
             await bot.delete_message(message.from_user.id, message.message_id)
         except: pass
 
+@admin_private_router.callback_query(StateFilter("*"), F.data=='delete_selected_message')
+async def delete_selected_message(callback: types.CallbackQuery) -> None:
+    message = callback.message
+    await message.delete()
+
+
 # отмена кнопкой  
 @admin_private_router.callback_query(StateFilter("*"), F.data.startswith('cancel'))
 async def cancel_handler(callback: types.CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession) -> None:
