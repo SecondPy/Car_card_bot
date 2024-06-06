@@ -1,5 +1,6 @@
 import asyncio
 import os
+from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 from aiogram import Bot, Dispatcher, types
 from database import orm_admin_query as admin_orm
@@ -16,7 +17,11 @@ from database.engine import create_db, drop_db, session_maker
 # from common.bot_cmds_list import private - для кнопки menu
 from middlewares.db import DataBaseSession
 
+
 from database.orm_admin_query import get_inline_message_id
+from const_values import ABBREVIATED_WEEK_DAYS
+from kbds.callback import get_callback_btns
+
 
 ALLOWED_UPDATES = ['message, edited_message']
 
@@ -49,9 +54,43 @@ async def start_utils() -> list[int]:
                now = datetime.now().time()
                if now > time(0, 15): date_finished_orders = date.today()
                if now > time(0, 10) and now < time(0, 15) and len(bot.admin_idle_timer.keys())==len([bot.admin_idle_timer[key] for key in bot.admin_idle_timer.keys() if bot.admin_idle_timer[key] > 30]):
-                   result = await admin_orm.finish_old_orders()
+                   session, finished_orders_count, admins_menu = await admin_orm.finish_old_orders()
                    date_finished_orders = date.today()
-                   delete = await bot.send_message(2136465129, text=f'Автоматически завершено {result} ордеров')
+                   delete = await bot.send_message(2136465129, text=f'Автоматически завершено {finished_orders_count} ордеров')
+                   
+                   for admin_menu in admins_menu:
+                        calendar_data = {}
+                        today = date.today()
+                        current_date = today - timedelta(days=(today.weekday()))
+                        last_date = current_date + timedelta(days=28)
+                        text = '⬇️ Актуальное расписание'
+                        for _ in range(7):
+                            calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
+                        while current_date < last_date:
+                            if current_date < today or current_date > (today+timedelta(days=28)):
+                                calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
+                            else:
+                                orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
+                                if orders_data and 'Выходной' not in {order.description for order in orders_data}:
+                                    if current_date != today or datetime.now().hour < 9: hours = 0
+                                    else: hours = (datetime.now().hour - 9) * 2
+                                    for order in orders_data:
+                                        hours += (order.ends - order.begins).total_seconds() // 3600
+                                    if hours < 4: inline_smile = '🟢'
+                                    elif hours < 9: inline_smile = '🟡'
+                                    elif hours < 17: inline_smile = '🟠'
+                                    else: inline_smile = '🔴'
+                                    text_button = f"{current_date.strftime('%d')}{inline_smile}"
+                                elif orders_data and 'Выходной' in {order.description for order in orders_data}:
+                                    text_button = f"{current_date.strftime('%d')}🥳"
+                                else: text_button = f"{current_date.strftime('%d')}🟢"
+                                calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = text_button
+                            current_date += timedelta(days=1)
+                        calendar_data[f"flip_month {today} back"] = f'⏪ назад'
+                        calendar_data[f"flip_month {today} next"] = f'вперед ⏩'
+                        await bot.edit_message_text(text=text, chat_id=admin_menu.tg_id, parse_mode=ParseMode.HTML)
+                        await bot.edit_message_reply_markup(chat_id=admin_menu.tg_id, reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
+                   
                    await asyncio.sleep(600)
                    await bot.delete_message(delete.message_id)
         except Exception as e: await bot.send_message(2136465129, text=f'Ошибка при выполнении кода: \n{e}')

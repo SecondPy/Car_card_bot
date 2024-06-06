@@ -13,16 +13,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import orm_admin_query as admin_orm
 
 from kbds.callback import get_callback_btns
-
+from utils.datetime_formatter import DateFormatter
 
 
 async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot, message: types.Message, trigger, text='', date_start=date.today()) -> None:
     calendar_data = {}
     current_date = date_start - timedelta(days=(date_start.weekday()))
     last_date = current_date + timedelta(days=28)
-    text += '⬇️ Актуальное расписание'
     today = date.today()
-
+    orders_data = await admin_orm.orm_get_order_with_date(session, datetime.combine(today, time(0, 0)))
+    if orders_data:
+        text += 'Наряды на сегодня:\n-'
+        text += '\n-'.join([(f"<b>{DateFormatter(order.begins).message_format[-5:]}</b> {order.description}") for order in orders_data])
+    
+    text += '\n\n⬇️ Актуальное расписание'
     for _ in range(7):
         calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
     while current_date < last_date:
@@ -35,7 +39,6 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
                 else: hours = (datetime.now().hour - 9) * 2
                 for order in orders_data:
                     hours += (order.ends - order.begins).total_seconds() // 3600
-                print(f'\n\n\nhours={hours}\n\n\n')
                 if hours < 4: inline_smile = '🟢'
                 elif hours < 9: inline_smile = '🟡'
                 elif hours < 17: inline_smile = '🟠'

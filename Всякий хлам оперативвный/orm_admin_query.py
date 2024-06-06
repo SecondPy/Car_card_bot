@@ -92,8 +92,8 @@ async def get_client_with_tg_id(session: AsyncSession, tg_client: int):
     client = result.scalar()
     return client
 
-async def orm_get_order_with_date(session: AsyncSession, date: datetime, status='actual') -> str:
-    query = select(Order).where(Order.status==status).filter(Order.begins>=date, Order.begins<date+timedelta(days=1)).order_by(Order.begins)
+async def orm_get_order_with_date(session: AsyncSession, date: date, status='actual') -> str:
+    query = select(Order).where(Order.status==status).filter(Order.begins>=date, Order.begins<date+timedelta(days=1))
     result = await session.execute(query)
     return result.scalars().all()
 
@@ -293,12 +293,9 @@ async def finish_old_orders():
     query = select(Order).where(Order.status=='actual').filter(Order.begins>today, Order.begins<today+timedelta(days=1))
     result = await session.execute(query)
     orders_to_finish = result.scalars().all()
-    query = select(AdminMenu)
-    result = await session.execute(query)
-    admins_menu = await result.scalars().all()
     if len(orders_to_finish) > 0:
         for order in orders_to_finish:
             query = update(Order).where(Order.id_order==order.id_order).values(status='finished')
             await session.execute(query)
             await session.commit()
-    return session, len(orders_to_finish), admins_menu
+    return len(orders_to_finish)
