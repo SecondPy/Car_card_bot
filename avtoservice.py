@@ -101,7 +101,7 @@ async def start_utils() -> list[int]:
 
         answered_hour = 0
         if 7 < now.hour < 18 and now.minute == 0 and now.second < 15 and answered_hour != now.hour:
-            if nearest_orders := await admin_orm.orm_get_order_with_date_time(session=None, date_time_order=datetime.combine(now.date(), time(now.hour, 0))):
+            if nearest_orders := await admin_orm.get_nearest_orders(date_time=datetime.combine(now.date(), time(now.hour, 0))):
                 admin_ids = await admin_orm.get_admins_ids(session=None)
                 btn, sizes = dict(), [1]
                 btn['delete_selected_message'] = '✅ Ок'

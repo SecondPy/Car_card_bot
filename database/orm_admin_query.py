@@ -304,3 +304,10 @@ async def finish_old_orders():
             await session.execute(query)
             await session.commit()
     return session, len(orders_to_finish), admins_menu
+
+
+async def get_nearest_orders(date_time: datetime):
+    session = session_maker()
+    query = select(Order).where(Order.begins==date_time+timedelta(hours=1))
+    result = await session.execute(query)
+    return result.scalars().all()
