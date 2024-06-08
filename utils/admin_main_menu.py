@@ -25,6 +25,7 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
     if orders_data:
         text += '🗓 Наряды на сегодня:\n-'
         text += '\n-'.join([(f"<b>{DateFormatter(order.begins).message_format[-5:]}</b> {order.description}") for order in orders_data])
+        print(f'\n\n\norders_data = {orders_data}\n\n\n')
     
     text += '\n\n⬇️ Актуальное расписание'
     for _ in range(7):

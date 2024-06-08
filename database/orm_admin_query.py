@@ -80,11 +80,13 @@ async def get_client_with_phone(session: AsyncSession, phone: str):
     client = result.scalar()
     return client
 
+
 async def get_client_with_id(session: AsyncSession, id_client: int):
     query = select(Client).where(Client.id_client==id_client)
     result = await session.execute(query)
     client = result.scalar()
     return client
+
 
 async def get_client_with_tg_id(session: AsyncSession, tg_client: int):
     query = select(Client).where(Client.id_telegram==tg_client)
@@ -92,10 +94,12 @@ async def get_client_with_tg_id(session: AsyncSession, tg_client: int):
     client = result.scalar()
     return client
 
+
 async def orm_get_order_with_date(session: AsyncSession, date: datetime, status='actual') -> str:
     query = select(Order).where(Order.status==status).filter(Order.begins>=date, Order.begins<date+timedelta(days=1)).order_by(Order.begins)
     result = await session.execute(query)
     return result.scalars().all()
+
 
 async def orm_get_order_with_date_and_place(session: AsyncSession, ask_date: datetime, place: int, status='actual') -> str:
     query = select(Order).where(
@@ -297,7 +301,7 @@ async def finish_old_orders():
     orders_to_finish = result.scalars().all()
     query = select(AdminMenu)
     result = await session.execute(query)
-    admins_menu = await result.scalars().all()
+    admins_menu = result.scalars().all()
     if len(orders_to_finish) > 0:
         for order in orders_to_finish:
             query = update(Order).where(Order.id_order==order.id_order).values(status='finished')
@@ -308,6 +312,6 @@ async def finish_old_orders():
 
 async def get_nearest_orders(date_time: datetime):
     session = session_maker()
-    query = select(Order).where(Order.begins==date_time+timedelta(hours=1))
+    query = select(Order).where(Order.begins==date_time+timedelta(hours=1), Order.status=='actual')
     result = await session.execute(query)
     return result.scalars().all()

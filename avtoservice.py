@@ -41,8 +41,8 @@ dp.include_routers(admin_private_router, client_private_router)
 
 async def update_menu():
     session, finished_orders_count, admins_menu = await admin_orm.finish_old_orders()
+    await bot.send_message(2136465129, text=f'получил данные из бд {admins_menu}')
     try:
-        date_finished_orders = date.today()
         delete = await bot.send_message(2136465129, text=f'Автоматически завершено {finished_orders_count} ордеров')
         for admin_menu in admins_menu:
              calendar_data = {}
@@ -94,11 +94,12 @@ async def start_utils() -> list[int]:
             for id_client in bot.client_idle_timer.keys():
                 bot.client_idle_timer[id_client] += 5
         if date_finished_orders < date.today():
-           now = datetime.now().time()
-           if now > time(0, 15): date_finished_orders = date.today()
-           if now > time(0, 10) and now < time(0, 15) and len(bot.admin_idle_timer.keys())==len([bot.admin_idle_timer[key] for key in bot.admin_idle_timer.keys() if bot.admin_idle_timer[key] > 30]): await update_menu()
+           now_time = datetime.now().time()
+           if now_time > time(0, 15): date_finished_orders = date.today()
+           if now_time > time(0, 10) and now_time < time(0, 15) and len(bot.admin_idle_timer.keys())==len([bot.admin_idle_timer[key] for key in bot.admin_idle_timer.keys() if bot.admin_idle_timer[key] > 30]):
+               await update_menu()
+        
         now = datetime.now()
-
         answered_hour = 0
         if 7 < now.hour < 18 and now.minute == 0 and now.second < 15 and answered_hour != now.hour:
             if nearest_orders := await admin_orm.get_nearest_orders(date_time=datetime.combine(now.date(), time(now.hour, 0))):
@@ -106,12 +107,15 @@ async def start_utils() -> list[int]:
                 btn, sizes = dict(), [1]
                 btn['delete_selected_message'] = '✅ Ок'
                 answered_hour = now.hour
-                for order in nearest_orders:
-                    for id in admin_ids:
-                        await bot.send_message(chat_id=id, text=f'Через час прибудет машина: {order.description}\nДолжна быть готова к {order.ends.hour}:00', reply_marup=get_callback_btns(btns=btn, sizes=sizes))
-            
-                                                                                                                         
-                                                                          
+                await bot.send_message(2136465129, text=f"{' '.join([order for order in nearest_orders])}")
+                for id in admin_ids:
+                    for order in nearest_orders:
+                        await bot.send_message(
+                            chat_id=id,
+                            text=f'Через час прибудет машина: {order.description}\nДолжна быть готова к {order.ends.hour}:00',
+                            reply_markup=get_callback_btns(btns=btn, sizes=sizes)
+                        )
+                                                          
         
         
 async def on_startup(bot):

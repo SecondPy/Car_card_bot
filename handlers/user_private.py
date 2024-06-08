@@ -1,7 +1,6 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime
 import time as t
 import random
-import locale
 import asyncio
 
 from aiogram import Bot, F, types, Router
@@ -17,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import orm_client_query as client_orm
 from database import orm_admin_query as admin_orm
+from utils.client_start_menu import main_menu_client_constructor
 from utils.find_phone import find_phone
 from utils.datetime_formatter import DateFormatter
 from filters.chat_types import ChatTypeFilter
@@ -37,22 +37,22 @@ class SendOrder(StatesGroup):
     phone = State()
 
 
-async def main_menu_client_constructor(session: AsyncSession, tg_id: int) -> list:
-    text = f'🛢 Адрес <b>ОйлЦентр</b>: Волжский, пл. Труда, 4а.\n📱 Тел: +78443210102 (9:00-18:00)\n'
-    btns_data, sizes = dict(), list()
-    btns_data['header withoud_data'] = '⬇️ Выберите действие ⬇️'
-    sizes.append(1)
-    btns_data['get_client_calendar'] = '🔧 Записаться 🔧'
-    btns_data[f'get_client_history {tg_id}'] = '📜 История 📜'
-    sizes.append(2)
-    actual_orders = await client_orm.find_orders_with_tg_id(session=session, tg_id=tg_id, status='actual')
-    if actual_orders:
-        for order in actual_orders:
-            text += f"\n-👨🏼‍🏭Ждём Вас на обслуживание {DateFormatter(order.begins).message_format}"
-    else:
-        text += f'\n-👨🏼‍🏭 записей о предстоящем обслуживании не найдено'
-
-    return [text, btns_data, sizes]
+#async def main_menu_client_constructor(session: AsyncSession, tg_id: int) -> list:
+#    text = f'🛢 Адрес <b>ОйлЦентр</b>: Волжский, пл. Труда, 4а.\n📱 Тел: +78443210102 (9:00-18:00)\n'
+#    btns_data, sizes = dict(), list()
+#    btns_data['header withoud_data'] = '⬇️ Выберите действие ⬇️'
+#    sizes.append(1)
+#    btns_data['get_client_calendar'] = '🔧 Записаться 🔧'
+#    btns_data[f'get_client_history {tg_id}'] = '📜 История 📜'
+#    sizes.append(2)
+#    actual_orders = await client_orm.find_orders_with_tg_id(session=session, tg_id=tg_id, status='actual')
+#    if actual_orders:
+#        for order in actual_orders:
+#            text += f"\n-👨🏼‍🏭Ждём Вас на обслуживание {DateFormatter(order.begins).message_format}"
+#    else:
+#        text += f'\n-👨🏼‍🏭 записей о предстоящем обслуживании не найдено'
+#
+#    return [text, btns_data, sizes]
 
 
 @client_private_router.callback_query(StateFilter("*"), F.data.startswith('client_cancel'))
