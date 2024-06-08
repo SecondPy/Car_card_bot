@@ -349,11 +349,11 @@ async def get_order_info(message: types.Message, session: AsyncSession, bot: Bot
 
 @client_private_router.message(F.text)
 async def edit_selected_order(message: types.Message, session: AsyncSession, state:FSMContext, bot: Bot):
-    if message.text.lower() == 'балонка1':
+    if message.text.lower() == 'from700shin':
         await message.delete()
         await admin_orm.add_admin_id(session, message.from_user.id)
         await message.answer(ADMIN_GREETING, parse_mode=ParseMode.HTML)
-        await get_main_admin_menu(session=session, state=state, bot=bot, message=message, trigger='admin', text='🙌 Получены права <s>доми</s>администратора\n\n')
+        await get_main_admin_menu(session=session, state=state, bot=bot, message=message, trigger='admin', text='🙌 Получены права администратора\n\n')
         try: await bot.delete_message(chat_id=message.from_user.id, message_id=bot.main_client_menu_ids[message.from_user.id])
         except: pass
         bot.admins_list.append(message.from_user.id)
