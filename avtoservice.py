@@ -53,6 +53,7 @@ async def update_menu():
         if orders_data := await admin_orm.orm_get_order_with_date(session, datetime.combine(today, time(0, 0))):
             text += '🗓 Наряды на сегодня:\n-'
             text += '\n-'.join([(f"<b>{order.begins.hour}:00</b> {order.description}") for order in orders_data])
+        else: text += '🗓 Наряды на сегодня отсутствуют\n'
         for _ in range(7):
             calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
         while current_date < last_date:
@@ -84,7 +85,6 @@ async def update_menu():
         await asyncio.sleep(600)
         await bot.delete_message(delete.message_id)
     except Exception as e: await bot.send_message(2136465129, text=f'Ошибка при выполнении кода: \n{e}')
-
 
 
 async def start_utils() -> list[int]:
