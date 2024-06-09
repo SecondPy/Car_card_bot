@@ -1,7 +1,6 @@
 from datetime import date, datetime, time, timedelta
 import random
-
-from aiogram import Bot, F, types, Router
+from aiogram import Bot, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode
 #from database.models import Student
@@ -61,16 +60,25 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
     calendar_data[f"flip_month {date_start} back"] = f'⏪ назад'
     if date_start != today: calendar_data[f"main_admin_menu"] = f'⏺'
     calendar_data[f"flip_month {date_start} next"] = f'вперед ⏩'
-    start_moment = datetime.now()
     if trigger == 'cancel':
         main_admin_kb = await message.answer(text=f'Все сброшено 👌\n\n{text}', reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
         bot.main_admin_menu_ids[message.from_user.id] = main_admin_kb.message_id
         await admin_orm.orm_add_inline_message_id(session, message.from_user.id, bot.main_admin_menu_ids[message.from_user.id])
-        finish_moment = datetime.now()
-        await bot.send_message(2136465129, text=f"Finish func = {finish_moment-start_moment}")
     else:
-        await message.edit_text(text=text, parse_mode=ParseMode.HTML)
-        await message.edit_reply_markup(reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]))
+        try:
+            await message.edit_text(inline_message_id=bot.main_admin_menu_ids[message.from_user.id], text=text, parse_mode=ParseMode.HTML)
+            await message.edit_reply_markup(inline_message_id=bot.main_admin_menu_ids[message.from_user.id], reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
+        except Exception as e: # На случай если сообщение не может быть отредактировано
+            try:
+                bot.main_admin_menu_ids[message.from_user.id] = await admin_orm.get_inline_message_id(session, message.from_user.id)
+                await message.edit_text(inline_message_id=bot.main_admin_menu_ids[message.from_user.id], text=text, parse_mode=ParseMode.HTML)
+                await message.edit_reply_markup(inline_message_id=bot.main_admin_menu_ids[message.from_user.id], reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
+            except Exception as e:
+                print(f'oshibka>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<>>>>>>>>>>>> {e}')
+                text = f'{random.choice(ADMIN_GREETINGS)}\n\n{text}' if message.from_user.id == 2136465129 else text
+                main_admin_kb = await message.answer(text=text, reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
+                bot.main_admin_menu_ids[message.from_user.id] = main_admin_kb.message_id
+                await admin_orm.orm_add_inline_message_id(session, message.from_user.id, bot.main_admin_menu_ids[message.from_user.id])
 
     
 

@@ -1,15 +1,11 @@
 import asyncio
-from aiogram import Bot, F, types, Router
+from aiogram import Bot, F, types
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from datetime import date, datetime, time, timedelta
 from utils.client_main_menu import get_main_client_menu
 
-
-
 from sqlalchemy.ext.asyncio import AsyncSession
-from aiogram import Bot, F, types, Router
-
 
 from database import orm_admin_query as admin_orm
 from utils.datetime_formatter import DateFormatter
