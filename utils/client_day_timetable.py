@@ -18,7 +18,7 @@ from kbds.callback import get_callback_btns
 
 async def get_client_day_timetable(message: types.Message, state: FSMContext, bot: Bot, session: AsyncSession, chosen_day: date, message_text=''):
     
-    message_text += f'\n🤖 <b>Открываю {DateFormatter(chosen_day).message_format}</b>\n'
+    message_text += f'\n🤖 <b>Открываю запись на {DateFormatter(chosen_day).message_format}</b>\n'
     btn_data = {}
     start_time = datetime.combine(chosen_day, time(9, 0))
     day_orders_data = await admin_orm.orm_get_order_with_date(session, chosen_day)
