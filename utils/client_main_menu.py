@@ -6,7 +6,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 #from database.models import Student
 #from database.orm_admin_query import orm_add_product
-from const_values import ABBREVIATED_WEEK_DAYS, ADMIN_GREETINGS
+from const_values import ABBREVIATED_WEEK_DAYS, CLIENT_CALENDAR_HEAD
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -22,7 +22,9 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
     today = date.today()
     current_date = today - timedelta(days=(today.weekday()))
     last_date = current_date + timedelta(days=28)
-    text = f'🗓 Выберите удобную дату в этом интерактивном календаре \n📲 Или запишитесь по телефону: +78443210102 (9:00-18:00)\n\n🔴 - день полность расписан\n🟠 - высокая загрузка\n🟡 - средняя загрузка\n🟢 - низкая загрузка\n\n🛢 Адрес <b>ОйлЦентр</b>: Волжский, пл Труда, 4а.\n\n⬇️ Актуальное расписание'
+    month_orders_data = await admin_orm.get_month_orders(session, current_date)
+    current_hour = datetime.now().hour
+    text = CLIENT_CALENDAR_HEAD
     for _ in range(7):
         calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
     while current_date < last_date:
@@ -30,20 +32,28 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
             calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
             text_button = f"{current_date.strftime('%d')}"
         else:
-            orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
-            if orders_data and 'Выходной' not in {order.description for order in orders_data}:
-                if current_date != today or datetime.now().hour < 9: hours = 0
-                else: hours = (datetime.now().hour - 9) * 2
-                for order in orders_data:
-                    hours += (order.ends - order.begins).total_seconds() // 3600
-                free_hours = 18 - hours
-                if free_hours > 5: inline_smile = '🟢'
-                elif free_hours > 2: inline_smile = '🟡'
-                elif free_hours > 0: inline_smile = '🟠'
-                else: inline_smile = '🔴'
-                text_button = f"{current_date.strftime('%d')}{inline_smile}"
-            else: text_button = f"{current_date.strftime('%d')}🟢"
-        calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = text_button
+            day_orders_data = [order for order in month_orders_data if order.begins.date()==current_date]
+            text_button = f"{current_date.strftime('%d')}"
+            if current_date == today and current_hour >= 9: hours = (current_hour - 9) * 2
+            else: hours = 0
+
+            if day_orders_data := [order for order in month_orders_data if order.begins.date()==current_date]:
+                if 'Выходной' in {order.description for order in day_orders_data}: text_button += '🥳'
+                else:
+                    if current_date == today and current_hour >= 9: hours = (current_hour - 9) * 2
+                    hours += sum([(order.ends - order.begins).total_seconds() for order in day_orders_data]) // 3600
+                
+            print(f'\n\nhours = {hours}\n\n')
+            inline_smile = (
+                '🟢' if hours < 4 else
+                '🟡' if hours < 9 else
+                '🟠' if hours < 17 else
+                '🔴'
+            )
+            text_button += inline_smile
+            
+
+            calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = text_button
         current_date += timedelta(days=1)
 
     calendar_data[f"main_menu_client"] = '🏠 Вернуться в главное меню 🏠'
@@ -52,20 +62,9 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
         bot.main_client_menu_ids[message.from_user.id] = main_client_kb.message_id
         await client_orm.add_inline_message_id(session, message.from_user.id, bot.main_client_menu_ids[message.from_user.id])
     else:
-        try:
-            await message.edit_text(inline_message_id=bot.main_client_menu_ids[message.from_user.id], text=text, parse_mode=ParseMode.HTML)
-            await message.edit_reply_markup(inline_message_id=bot.main_client_menu_ids[message.from_user.id], reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
-        except Exception as e: # На случай если сообщение не может быть отредактировано
-            try:
-                bot.main_client_menu_ids[message.from_user.id] = await client_orm.get_inline_message_id(session, message.from_user.id)
-                await message.edit_text(inline_message_id=bot.main_client_menu_ids[message.from_user.id], text=text, parse_mode=ParseMode.HTML)
-                await message.edit_reply_markup(inline_message_id=bot.main_client_menu_ids[message.from_user.id], reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
-            except Exception as e:
-                print(f'oshibka>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<>>>>>>>>>>>> {e}')
-                main_client_kb = await message.answer(text=text, reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
-                bot.main_client_menu_ids[message.from_user.id] = main_client_kb.message_id
-                await client_orm.add_inline_message_id(session, message.from_user.id, bot.main_client_menu_ids[message.from_user.id])
-    
+        await message.edit_text(text=text, parse_mode=ParseMode.HTML)
+        await message.edit_reply_markup(reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]))
+
     try: await state.clear()
     except: pass
 

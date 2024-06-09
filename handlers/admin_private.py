@@ -223,6 +223,7 @@ async def show_calendar_by_callback(callback: types.CallbackQuery, state: FSMCon
     bot.admin_idle_timer[callback.message.from_user.id] = 0
     
     await get_main_admin_menu(session=session, state=state, bot=bot, message=callback.message, trigger='button', date_start=date.today())
+    await admin_orm.orm_add_inline_message_id(session, callback.from_user.id, callback.message.message_id)
 
 
 @admin_private_router.callback_query(F.data.startswith('flip_month'))
@@ -274,9 +275,7 @@ async def add_new_order(callback: types.CallbackQuery, state: FSMContext, bot: B
     message = callback.message  # Для упрощения кода создаем переменную с объектом message
     date_time_callback = datetime.strptime(callback_data[1], '%Y-%m-%d-%H') # Дата в формате DateTime
     message_date_callback_message_format = DateFormatter(date_time_callback).message_format    # форматируем дату в человекояз
-    order_place = int(callback_data[2])
-    print(f'\n\norder_place={order_place}\n\n')
-    
+    order_place = int(callback_data[2]) 
 
     await state.update_data(
         begins=date_time_callback,
@@ -418,7 +417,6 @@ async def edit_selected_order(callback: types.CallbackQuery, state: FSMContext, 
         if bot.admin_idle_timer[callback.message.from_user.id] > 13:
             await bot.delete_message(callback.from_user.id, hystory_message.message_id)
             hystory_message_deleted = True
-
 
 
 @admin_private_router.callback_query(F.data.startswith('many_busy_time'))

@@ -1,6 +1,5 @@
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy.orm import sessionmaker
 from database.engine import session_maker
 
 from sqlalchemy import select, update, delete
@@ -27,7 +26,6 @@ async def orm_add_inline_message_id(session: AsyncSession, tg_id: int, inline_me
         await session.commit()
 
 async def get_inline_message_id(session: AsyncSession, tg_id: int):
-    print(f'\n\nsession = {session}\n\n')
     query = select(AdminMenu.inline_message_id).where(tg_id==tg_id)
     result = await session.execute(query)
     id = result.scalar()
@@ -95,6 +93,12 @@ async def get_client_with_tg_id(session: AsyncSession, tg_client: int):
     return client
 
 
+async def get_month_orders(session: AsyncSession, start_date: datetime, status='actual'):
+    query = select(Order).where(Order.status==status).filter(Order.begins>=start_date, Order.begins<start_date+timedelta(days=29)).order_by(Order.begins)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
 async def orm_get_order_with_date(session: AsyncSession, date: datetime, status='actual') -> str:
     query = select(Order).where(Order.status==status).filter(Order.begins>=date, Order.begins<date+timedelta(days=1)).order_by(Order.begins)
     result = await session.execute(query)
@@ -111,10 +115,16 @@ async def orm_get_order_with_date_and_place(session: AsyncSession, ask_date: dat
     return result.scalars().all()
 
 async def orm_get_order_with_date_time(session: AsyncSession, date_time_order: datetime, status='actual'):
-    if not session: session = session_maker()
-    query = select(Order).where(Order.status==status).filter(Order.begins<=date_time_order, Order.ends>date_time_order)
-    result = await session.execute(query)
+    if not session: 
+        session = session_maker()
+        query = select(Order).where(Order.status==status).filter(Order.begins<=date_time_order, Order.ends>date_time_order)
+        result = await session.execute(query)
+        await session.close()
+    else:
+        query = select(Order).where(Order.status==status).filter(Order.begins<=date_time_order, Order.ends>date_time_order)
+        result = await session.execute(query)
     return result.scalars().all()
+
 
 
 async def orm_get_order_with_date_time_and_place(session: AsyncSession, date_time_order: datetime, place: int, status='actual'):
@@ -287,10 +297,16 @@ async def add_admin_id(session: AsyncSession, tg_id: int):
 
 
 async def get_admins_ids(session: AsyncSession):
-    if not session: session = session_maker()
-    query = select(AdminIds.tg_id)
-    result = await session.execute(query)
-    ids = result.scalars().all()
+    if not session: 
+        session = session_maker()
+        query = select(AdminIds.tg_id)
+        result = await session.execute(query)
+        ids = result.scalars().all()
+        await session.close()
+    else:
+        query = select(AdminIds.tg_id)
+        result = await session.execute(query)
+        ids = result.scalars().all()
     return ids
 
 async def finish_old_orders():
@@ -307,6 +323,7 @@ async def finish_old_orders():
             query = update(Order).where(Order.id_order==order.id_order).values(status='finished')
             await session.execute(query)
             await session.commit()
+    await session.close()
     return session, len(orders_to_finish), admins_menu
 
 
@@ -314,4 +331,5 @@ async def get_nearest_orders(date_time: datetime):
     session = session_maker()
     query = select(Order).where(Order.begins==date_time+timedelta(hours=1), Order.status=='actual')
     result = await session.execute(query)
+    await session.close()
     return result.scalars().all()

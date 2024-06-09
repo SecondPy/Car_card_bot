@@ -40,8 +40,9 @@ async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot
     else: ask_orders_status = 'actual'
         
     message_text += f'\n📆 <b>{DateFormatter(chosen_day).message_format}</b>\n'
-    orders_data = await admin_orm.orm_get_order_with_date_time(session, working_hour)
+    orders_data = await admin_orm.orm_get_order_with_date(session, chosen_day.date())
     is_weekend = [order.id_order for order in orders_data if order.description=='Выходной']
+    
     if is_weekend:
         message_text += '🥳 День помечен как выходной 🥳'
         btn_data[f"weekend_cancel {chosen_day.date()} {is_weekend[0]}"] = "🧑🏼‍🏭 отменить выходной 🧑🏼‍🏭"
@@ -52,8 +53,8 @@ async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot
 
         while working_hour < work_day_ending:
             str_day_time = datetime.strftime(working_hour, '%H')
-            current_time_orders_place_1 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 1, status=ask_orders_status)
-            current_time_orders_place_2 = await admin_orm.orm_get_order_with_date_time_and_place(session, working_hour, 2, status=ask_orders_status)
+            current_time_orders_place_1 = [order for order in orders_data if order.place==1 and order.begins <= working_hour < order.ends]
+            current_time_orders_place_2 = [order for order in orders_data if order.place==2 and order.begins <= working_hour < order.ends]
             for place_num, place_data in enumerate([current_time_orders_place_1, current_time_orders_place_2]):
                 if len(place_data) > 1:
                     btn_data[f"many_busy_time {' '.join([str(order.id_order) for order in place_data])}"] = f"🔧 {len(place_data)} наряда 🔧"

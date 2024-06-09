@@ -44,38 +44,42 @@ async def update_menu():
     await bot.send_message(2136465129, text=f'получил данные из бд {admins_menu}')
     try:
         delete = await bot.send_message(2136465129, text=f'Автоматически завершено {finished_orders_count} ордеров')
+        
+        calendar_data = {}
+        today = date.today()
+        current_date = today - timedelta(days=(today.weekday()))
+        last_date = current_date + timedelta(days=28)
+        text = '\n⬇️ Актуальное расписание'
+        if orders_data := await admin_orm.orm_get_order_with_date(session, datetime.combine(today, time(0, 0))):
+            text += '🗓 Наряды на сегодня:\n-'
+            text += '\n-'.join([(f"<b>{order.begins.hour}:00</b> {order.description}") for order in orders_data])
+        for _ in range(7):
+            calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
+        while current_date < last_date:
+            if current_date < today or current_date > (today+timedelta(days=28)):
+                calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
+            else:
+                orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
+                if orders_data and 'Выходной' not in {order.description for order in orders_data}:
+                    if current_date != today or datetime.now().hour < 9: hours = 0
+                    else: hours = (datetime.now().hour - 9) * 2
+                    for order in orders_data:
+                        hours += (order.ends - order.begins).total_seconds() // 3600
+                    if hours < 4: inline_smile = '🟢'
+                    elif hours < 9: inline_smile = '🟡'
+                    elif hours < 17: inline_smile = '🟠'
+                    else: inline_smile = '🔴'
+                    text_button = f"{current_date.strftime('%d')}{inline_smile}"
+                elif orders_data and 'Выходной' in {order.description for order in orders_data}:
+                    text_button = f"{current_date.strftime('%d')}🥳"
+                else: text_button = f"{current_date.strftime('%d')}🟢"
+                calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = text_button
+            current_date += timedelta(days=1)
+        calendar_data[f"flip_month {today} back"] = f'⏪ назад'
+        calendar_data[f"flip_month {today} next"] = f'вперед ⏩'
         for admin_menu in admins_menu:
-             calendar_data = {}
-             today = date.today()
-             current_date = today - timedelta(days=(today.weekday()))
-             last_date = current_date + timedelta(days=28)
-             text = '⬇️ Актуальное расписание'
-             for _ in range(7):
-                 calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
-             while current_date < last_date:
-                 if current_date < today or current_date > (today+timedelta(days=28)):
-                     calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = f"{current_date.strftime('%d.%m')}"
-                 else:
-                     orders_data = await admin_orm.orm_get_order_with_date(session, current_date)
-                     if orders_data and 'Выходной' not in {order.description for order in orders_data}:
-                         if current_date != today or datetime.now().hour < 9: hours = 0
-                         else: hours = (datetime.now().hour - 9) * 2
-                         for order in orders_data:
-                             hours += (order.ends - order.begins).total_seconds() // 3600
-                         if hours < 4: inline_smile = '🟢'
-                         elif hours < 9: inline_smile = '🟡'
-                         elif hours < 17: inline_smile = '🟠'
-                         else: inline_smile = '🔴'
-                         text_button = f"{current_date.strftime('%d')}{inline_smile}"
-                     elif orders_data and 'Выходной' in {order.description for order in orders_data}:
-                         text_button = f"{current_date.strftime('%d')}🥳"
-                     else: text_button = f"{current_date.strftime('%d')}🟢"
-                     calendar_data[f"get_day {current_date.strftime('%Y-%m-%d')}"] = text_button
-                 current_date += timedelta(days=1)
-             calendar_data[f"flip_month {today} back"] = f'⏪ назад'
-             calendar_data[f"flip_month {today} next"] = f'вперед ⏩'
-             await bot.edit_message_text(text=text, chat_id=admin_menu.tg_id, parse_mode=ParseMode.HTML)
-             await bot.edit_message_reply_markup(chat_id=admin_menu.tg_id, reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
+            await bot.edit_message_text(text=text, chat_id=admin_menu.tg_id, message_id=admin_menu.inline_message_id, parse_mode=ParseMode.HTML)
+            await bot.edit_message_reply_markup(chat_id=admin_menu.tg_id, message_id=admin_menu.inline_message_id, reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]))
         
         await asyncio.sleep(600)
         await bot.delete_message(delete.message_id)
@@ -85,6 +89,7 @@ async def update_menu():
 
 async def start_utils() -> list[int]:
     date_finished_orders = datetime(1900, 1, 1).date()
+    answered_hour = 0
     while True:
         await asyncio.sleep(5)
         if bot.admin_idle_timer:
@@ -94,13 +99,14 @@ async def start_utils() -> list[int]:
             for id_client in bot.client_idle_timer.keys():
                 bot.client_idle_timer[id_client] += 5
         if date_finished_orders < date.today():
-           now_time = datetime.now().time()
-           if now_time > time(0, 15): date_finished_orders = date.today()
-           if now_time > time(0, 10) and now_time < time(0, 15) and len(bot.admin_idle_timer.keys())==len([bot.admin_idle_timer[key] for key in bot.admin_idle_timer.keys() if bot.admin_idle_timer[key] > 30]):
+            now_time = datetime.now().time()
+            if now_time > time(0, 15): date_finished_orders = date.today()
+            if now_time > time(0, 10) and now_time < time(0, 15) and len(bot.admin_idle_timer.keys())==len([bot.admin_idle_timer[key] for key in bot.admin_idle_timer.keys() if bot.admin_idle_timer[key] > 30]):
                await update_menu()
+               date_finished_orders = date.today()
         
         now = datetime.now()
-        answered_hour = 0
+        
         if 7 < now.hour < 18 and now.minute == 0 and now.second < 15 and answered_hour != now.hour:
             if nearest_orders := await admin_orm.get_nearest_orders(date_time=datetime.combine(now.date(), time(now.hour, 0))):
                 admin_ids = await admin_orm.get_admins_ids(session=None)
@@ -108,15 +114,14 @@ async def start_utils() -> list[int]:
                 btn['delete_selected_message'] = '✅ Ок'
                 answered_hour = now.hour
                 await bot.send_message(2136465129, text=f"{' '.join([order for order in nearest_orders])}")
-                for id in admin_ids:
-                    for order in nearest_orders:
+                for order in nearest_orders:
+                    for id in admin_ids:
                         await bot.send_message(
                             chat_id=id,
                             text=f'Через час прибудет машина: {order.description}\nДолжна быть готова к {order.ends.hour}:00',
                             reply_markup=get_callback_btns(btns=btn, sizes=sizes)
                         )
-                                                          
-        
+
         
 async def on_startup(bot):
 
@@ -125,7 +130,6 @@ async def on_startup(bot):
         await drop_db()
 
     await create_db()
-
 
 
 async def main() -> None:

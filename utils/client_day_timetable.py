@@ -21,11 +21,11 @@ async def get_client_day_timetable(message: types.Message, state: FSMContext, bo
     message_text += f'\n🤖 <b>Открываю {DateFormatter(chosen_day).message_format}</b>\n'
     btn_data = {}
     start_time = datetime.combine(chosen_day, time(9, 0))
-    
+    day_orders_data = await admin_orm.orm_get_order_with_date(session, chosen_day)
 
     while start_time < datetime.combine(chosen_day, time(18, 0)):
-        orders_data = await admin_orm.orm_get_order_with_date_time(session, start_time)
-        place_closed = len([order.place for order in orders_data])
+        time_orders_data = [order for order in day_orders_data if order.begins <= start_time < order.ends]
+        place_closed = len([order.place for order in time_orders_data])
         str_start_time = datetime.strftime(start_time, '%H')
         if chosen_day == date.today() and start_time.hour <= datetime.now().hour: btn_data[f"closed_time not_order {str_start_time}"] = f"🔓 Недоступно для записи 🔓"
         elif place_closed == 2: btn_data[f"closed_time {datetime.now().microsecond} {str_start_time}"] = f"🔓 Недоступно для записи 🔓"
