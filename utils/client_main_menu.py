@@ -43,7 +43,6 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
                     if current_date == today and current_hour >= 9: hours = (current_hour - 9) * 2
                     hours += sum([(order.ends - order.begins).total_seconds() for order in day_orders_data]) // 3600
                 
-            print(f'\n\nhours = {hours}\n\n')
             inline_smile = (
                 '🟢' if hours < 4 else
                 '🟡' if hours < 9 else
