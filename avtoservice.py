@@ -114,7 +114,6 @@ async def start_utils() -> list[int]:
                 btn, sizes = dict(), [1]
                 btn['delete_selected_message'] = '✅ Ок'
                 answered_hour = now.hour
-                await bot.send_message(2136465129, text=f"{' '.join([order for order in nearest_orders])}")
                 for order in nearest_orders:
                     for id in admin_ids:
                         await bot.send_message(
