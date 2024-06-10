@@ -309,10 +309,11 @@ async def get_admins_ids(session: AsyncSession):
         ids = result.scalars().all()
     return ids
 
+
 async def finish_old_orders():
     session = session_maker()
-    today = datetime.combine(date.today(), time(0, 0))
-    query = select(Order).where(Order.status=='actual').filter(Order.begins>today, Order.begins<today+timedelta(days=1))
+    yesterday = datetime.combine(date.today()-timedelta(days=1), time(0, 0))
+    query = select(Order).where(Order.status=='actual').filter(Order.begins>yesterday, Order.begins<yesterday+timedelta(days=1))
     result = await session.execute(query)
     orders_to_finish = result.scalars().all()
     query = select(AdminMenu)

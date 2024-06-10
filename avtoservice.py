@@ -81,7 +81,7 @@ async def update_menu():
             await bot.edit_message_reply_markup(chat_id=admin_menu.tg_id, message_id=admin_menu.inline_message_id, reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]))
         await session.close()
         await asyncio.sleep(600)
-        await bot.delete_message(delete.message_id)
+        await delete.delete()
     except Exception as e:
         await bot.send_message(2136465129, text=f'Ошибка при выполнении кода: \n{e}')
         await session.close()
