@@ -65,7 +65,7 @@ async def update_menu():
                     for order in orders_data:
                         hours += (order.ends - order.begins).total_seconds() // 3600
                     if hours < 4: inline_smile = '🟢'
-                    elif hours < 9: inline_smile = '🟡'
+                    elif hours < 12: inline_smile = '🟡'
                     elif hours < 17: inline_smile = '🟠'
                     else: inline_smile = '🔴'
                     text_button = f"{current_date.strftime('%d')}{inline_smile}"
