@@ -41,10 +41,8 @@ dp.include_routers(admin_private_router, client_private_router)
 
 async def update_menu():
     session, finished_orders_count, admins_menu = await admin_orm.finish_old_orders()
-    await bot.send_message(2136465129, text=f'получил данные из бд {admins_menu}')
     try:
         delete = await bot.send_message(2136465129, text=f'Автоматически завершено {finished_orders_count} ордеров')
-        
         calendar_data = {}
         today = date.today()
         current_date = today - timedelta(days=(today.weekday()))
@@ -81,10 +79,12 @@ async def update_menu():
         for admin_menu in admins_menu:
             await bot.edit_message_text(text=text, chat_id=admin_menu.tg_id, message_id=admin_menu.inline_message_id, parse_mode=ParseMode.HTML)
             await bot.edit_message_reply_markup(chat_id=admin_menu.tg_id, message_id=admin_menu.inline_message_id, reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]))
-        
+        await session.close()
         await asyncio.sleep(600)
         await bot.delete_message(delete.message_id)
-    except Exception as e: await bot.send_message(2136465129, text=f'Ошибка при выполнении кода: \n{e}')
+    except Exception as e:
+        await bot.send_message(2136465129, text=f'Ошибка при выполнении кода: \n{e}')
+        await session.close()
 
 
 async def start_utils() -> list[int]:

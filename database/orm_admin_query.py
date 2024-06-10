@@ -323,7 +323,7 @@ async def finish_old_orders():
             query = update(Order).where(Order.id_order==order.id_order).values(status='finished')
             await session.execute(query)
             await session.commit()
-    await session.close()
+    
     return session, len(orders_to_finish), admins_menu
 
 
