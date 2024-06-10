@@ -44,7 +44,13 @@ async def new_order_menu_constructor(session: AsyncSession, data: dict) -> tuple
     #(text, buttons_data, sizes)
     answer_text = f"-🤖 Собираю данные для наряда на <b>{data['message_date']}:</b>\n\n"
     answer_text += f"-🕰 Начало в <b>{data['begins'].hour}:00</b>. Машина будет готова к <b>{data['ends'].hour}:00</b>\n"
-    if 'client' in data: answer_text += f"\n-{random.choice(CLIENT_EMOJI)} наряд будет привязан к клиенту: <b>+7{data['client'].phone_client or data['client'].id_telegram}</b>"
+    if 'client' in data: 
+        answer_text += f"\n-{random.choice(CLIENT_EMOJI)} наряд будет привязан к клиенту: <b>+7{data['client'].phone_client or data['client'].id_telegram}</b>"
+        if data['car'] != 0:
+            car = await admin_orm.get_car_with_id(session, data['car'])
+
+
+
     if 'description' in data: answer_text += f"\n-📝Описание есть: <b>{data['description']}</b>\n"
     else: answer_text += '\n\n🤖 ожидаю описание'
     new_order_buttons, sizes = dict(), list()
@@ -280,6 +286,7 @@ async def add_new_order(callback: types.CallbackQuery, state: FSMContext, bot: B
     await state.update_data(
         begins=date_time_callback,
         ends=date_time_callback+timedelta(hours=1),
+        car=0,
         place=order_place,
         message_date=message_date_callback_message_format,
         message_id=message.message_id,
@@ -309,6 +316,8 @@ async def get_new_order_data(message: types.Message, bot: Bot, state: FSMContext
             client = await admin_orm.get_client_with_phone(session, is_phone) or await admin_orm.add_new_client_with_phone(session, is_phone)
         elif 'client_request' in context_data:
             client = await admin_orm.add_phone_to_client_with_tg_id(session, context_data['client_request'].id_telegram, is_phone)
+        if client_cars := await admin_orm.get_client_cars(session, client.id_client):
+            await state.update_data(car=client_cars[0].id_car)
         
         await state.update_data(client=client)
         context_data = await state.get_data()
@@ -392,6 +401,15 @@ async def push_new_order(callback: types.CallbackQuery, state: FSMContext, bot: 
         day = context_data['begins'] - timedelta(hours=context_data['begins'].hour)
         await get_admin_day_timetable(callback.message, state, bot, session, day, '✅ Наряд успешно добавлен')
     
+    admin_ids = await admin_orm.get_admins_ids(session=None)
+    text, btns = await get_main_admin_menu(session=session, state=state, bot=bot, message=callback.message, trigger='update_other_admins', date_start=date.today())
+    for admin_menu in admin_ids:
+        if admin_menu.tg_id != callback.message.from_user.id:
+            try:
+                await bot.edit_message_text(text=text, chat_id=admin_menu.tg_id, message_id=admin_menu.inline_message_id, parse_mode=ParseMode.HTML)
+                await bot.edit_message_reply_markup(chat_id=admin_menu.tg_id, message_id=admin_menu.inline_message_id, reply_markup=get_callback_btns(btns=btns, sizes=[7]))
+            except Exception as e: print(f'\n\n\nОшибка в обновлении главного меню админов: {e}\n\n\n')
+
 
 
 @admin_private_router.callback_query(F.data.startswith('show_admin_history'))

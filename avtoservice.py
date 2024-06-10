@@ -28,7 +28,7 @@ ALLOWED_UPDATES = ['message, edited_message']
 # 6191676658:AAG65LUtn8c7kvpmUNbiuvC-8Qmi9J9H24o - avtoservice_34
 # 6506294620:AAGbP2Bi8VKLSC0UCobcFRKOE3SnxUVD2-k чайная
 # 2102094577:AAHKWVSqsvbU86GC0yvH2CGIZ7s9xY_kp2c - carcardbot
-bot = Bot(token='2102094577:AAHKWVSqsvbU86GC0yvH2CGIZ7s9xY_kp2c')
+bot = Bot(token='6191676658:AAG65LUtn8c7kvpmUNbiuvC-8Qmi9J9H24o')
 bot.admins_list = [] # 2136465129 - мой 9965109078
 
 bot.admin_idle_timer, bot.client_idle_timer = dict(), dict()
@@ -114,13 +114,20 @@ async def start_utils() -> list[int]:
                 btn, sizes = dict(), [1]
                 btn['delete_selected_message'] = '✅ Ок'
                 answered_hour = now.hour
+                delete_messages = list()
                 for order in nearest_orders:
                     for id in admin_ids:
-                        await bot.send_message(
+                        message = await bot.send_message(
                             chat_id=id,
-                            text=f'Через час прибудет машина: {order.description}\nДолжна быть готова к {order.ends.hour}:00',
+                            text=f'Через час прибудет: {order.description}\nРаспланирована до {order.ends.hour}:00',
                             reply_markup=get_callback_btns(btns=btn, sizes=sizes)
                         )
+                        delete_messages.append(message)
+                
+                await asyncio.sleep(3300)
+                try:
+                    for message in delete_messages: message.delete()
+                except: pass
 
         
 async def on_startup(bot):

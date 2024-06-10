@@ -6,7 +6,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from database.models import AdminIds, AdminMenu, Client, ClientRequest, Order
+from database.models import AdminIds, AdminMenu, Car, Client, ClientRequest, Order
 
 
 async def orm_add_inline_message_id(session: AsyncSession, tg_id: int, inline_message_id: str):
@@ -190,7 +190,7 @@ async def push_new_order(session:AsyncSession, order_data):
         begins=order_data['begins'],
         ends=order_data['ends'],
         place=order_data['place'],
-        id_car=0,
+        id_car=order_data['car'],
         description=order_data['description'],
         status=status,
         id_client=id_client,
@@ -308,6 +308,17 @@ async def get_admins_ids(session: AsyncSession):
         result = await session.execute(query)
         ids = result.scalars().all()
     return ids
+
+
+async def get_client_cars(session: AsyncSession, id_client: int, status='actual'):
+    query = select(Car).where(Car.id_client==id_client, Car.car_status==status)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+async def get_car_with_id(session: AsyncSession, id_car: int):
+    query = select(Car).where(Car.id_car==id_car)
+    result = await session.execute(query)
+    return result.scalar()
 
 
 async def finish_old_orders():
