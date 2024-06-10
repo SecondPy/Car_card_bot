@@ -48,6 +48,7 @@ async def new_order_menu_constructor(session: AsyncSession, data: dict) -> tuple
         answer_text += f"\n-{random.choice(CLIENT_EMOJI)} наряд будет привязан к клиенту: <b>+7{data['client'].phone_client or data['client'].id_telegram}</b>"
         if data['car'] != 0:
             car = await admin_orm.get_car_with_id(session, data['car'])
+            answer_text += f'Ремонитруется авто: {car.car_model}'
 
 
 
@@ -69,6 +70,13 @@ async def new_order_menu_constructor(session: AsyncSession, data: dict) -> tuple
         else: sizes = [3]*(len(new_order_buttons)//3)
     if 'client' in data:
         orders_history = await admin_orm.get_orders_with_client_id(session, data['client'].id_client)
+        new_order_buttons[f"create_new_car {data['client'].id_client}"] = '🚗 Добавить новое авто'
+        sizes.append(1)
+        cars = await admin_orm.get_client_cars(session, data['client'].id_client)
+        if len(cars) > 1:
+            for car in cars: new_order_buttons[f"select_car {car.id_car}"] = f'🚘{car.model}'
+            sizes.append(len(cars))
+
         if len(orders_history) > 0:
             new_order_buttons[f"show_admin_history {' '.join([str(order.id_order) for order in orders_history])}"] = f'📖 показать историю 📖 ({len(orders_history)})'
             sizes.append(1)
@@ -301,6 +309,10 @@ async def add_new_order(callback: types.CallbackQuery, state: FSMContext, bot: B
     await message.edit_reply_markup(reply_markup=get_callback_btns(btns=btns_data, sizes=sizes))
 
     await state.set_state(FSMAdminNewOrder.get_new_order_data)
+
+@admin_private_router.callback_query(F.data.startswith('create_new_car'))
+async def get_new_order_hours(callback: types.CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession):
+    message = callback.message
 
 
 @admin_private_router.message(FSMAdminNewOrder.get_new_order_data, F.text)
