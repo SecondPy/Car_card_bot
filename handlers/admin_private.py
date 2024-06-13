@@ -70,7 +70,7 @@ async def new_order_menu_constructor(session: AsyncSession, data: dict) -> tuple
         else: sizes = [3]*(len(new_order_buttons)//3)
     if 'client' in data:
         orders_history = await admin_orm.get_orders_with_client_id(session, data['client'].id_client)
-        new_order_buttons[f"create_new_car {data['client'].id_client}"] = '🚗 Добавить новое авто'
+        new_order_buttons[f"create_new_car {data['client'].id_client}"] = '🚗 Привязать новое авто'
         sizes.append(1)
         cars = await admin_orm.get_client_cars(session, data['client'].id_client)
         if len(cars) > 1:
@@ -175,7 +175,7 @@ async def edit_order_menu_constructor(session: AsyncSession, id_order: int, call
         btns_data[f"get_day {order_data.begins}"] = '↩️ Вернуться'
         sizes.append(2)
 
-        answer_text += '\n-🤖 <b>можно отправить фото с процесса ремонта или фото заказ-наряда. Оно будет доступно в истории и при необходимости можно будет удалить. \n❗️Возможны ошибки при множественной загрузке сразу нескольких фото❗️</b>'
+        answer_text += '\n-🤖 <b>можно отправить фото с процесса ремонта или фото заказ-наряда. Оно будет доступно в истории, а при необходимости можно будет удалить. \n❗️Возможны ошибки при загрузке сразу нескольких фото❗️</b>'
     
     else:
         answer_text += f'\n-🤖 <b>напиши {btn_text_services[callback]}</b>'
@@ -295,6 +295,7 @@ async def add_new_order(callback: types.CallbackQuery, state: FSMContext, bot: B
         begins=date_time_callback,
         ends=date_time_callback+timedelta(hours=1),
         car=0,
+        create_car=False,
         place=order_place,
         message_date=message_date_callback_message_format,
         message_id=message.message_id,
@@ -310,31 +311,40 @@ async def add_new_order(callback: types.CallbackQuery, state: FSMContext, bot: B
 
     await state.set_state(FSMAdminNewOrder.get_new_order_data)
 
-@admin_private_router.callback_query(F.data.startswith('create_new_car'))
+@admin_private_router.callback_query(FSMAdminNewOrder.get_new_order_data, F.data.startswith('create_new_car'))
 async def get_new_order_hours(callback: types.CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession):
-    message = callback.message
+    await callback.answer('Введи марку и модель автомобиля 1 сообщением', show_alert=True)
+    await state.update_data(create_car=True)
+
 
 
 @admin_private_router.message(FSMAdminNewOrder.get_new_order_data, F.text)
 async def get_new_order_data(message: types.Message, bot: Bot, state: FSMContext, session: AsyncSession):
     bot.admin_idle_timer[message.from_user.id] = 0
 
-    await state.update_data(description=message.text)
+    
     context_data = await state.get_data()
 
-    is_phone = await find_phone(message.text)
-    if is_phone:
-        if 'client_request' not in context_data:
-            client = await admin_orm.get_client_with_phone(session, is_phone) or await admin_orm.add_new_client_with_phone(session, is_phone)
-        elif 'client_request' in context_data:
-            client = await admin_orm.add_phone_to_client_with_tg_id(session, context_data['client_request'].id_telegram, is_phone)
-        if client_cars := await admin_orm.get_client_cars(session, client.id_client):
-            await state.update_data(car=client_cars[0].id_car)
-        
-        await state.update_data(client=client)
-        context_data = await state.get_data()
+    if not context_data['create_car']: 
+        await state.update_data(description=message.text)
+        is_phone = await find_phone(message.text)
+        if is_phone:
+            if 'client_request' not in context_data:
+                client = await admin_orm.get_client_with_phone(session, is_phone) or await admin_orm.add_new_client_with_phone(session, is_phone)
+            elif 'client_request' in context_data:
+                client = await admin_orm.add_phone_to_client_with_tg_id(session, context_data['client_request'].id_telegram, is_phone)
+            if client_cars := await admin_orm.get_client_cars(session, client.id_client):
+                await state.update_data(car=client_cars[0].id_car)
+
+            await state.update_data(client=client)
+            context_data = await state.get_data()
     
+    else:
+        new_car = await admin_orm.add_new_car(session, context_data['client'], message.text.capitalize())
+        await state.update_data(create_car=False, car=new_car.id_car)
+
     
+    context_data = await state.get_data()
     answer_text, btns_data, sizes = await new_order_menu_constructor(session, context_data)
     await bot.edit_message_text(chat_id=message.from_user.id, message_id=context_data['message_id'], text=answer_text, parse_mode=ParseMode.HTML)
     await bot.edit_message_reply_markup(chat_id=message.from_user.id, message_id=context_data['message_id'], reply_markup=get_callback_btns(btns=btns_data, sizes=sizes))
@@ -413,7 +423,7 @@ async def push_new_order(callback: types.CallbackQuery, state: FSMContext, bot: 
         day = context_data['begins'] - timedelta(hours=context_data['begins'].hour)
         await get_admin_day_timetable(callback.message, state, bot, session, day, '✅ Наряд успешно добавлен')
     
-    admin_ids = await admin_orm.get_admins_ids(session=None)
+    admin_ids = await admin_orm.get_admins_menu(session)
     text, btns = await get_main_admin_menu(session=session, state=state, bot=bot, message=callback.message, trigger='update_other_admins', date_start=date.today())
     for admin_menu in admin_ids:
         if admin_menu.tg_id != callback.message.from_user.id:
@@ -569,11 +579,7 @@ async def edit_selected_order(message: types.Message, state: FSMContext, bot: Bo
             message_is_deleted = True
         except: message_is_deleted = True
     
-    await state.set_state(FSMAdminFinishOrder.finish_order)
-
-    
-    
-    
+    await state.set_state(FSMAdminFinishOrder.finish_order)  
 
 
 @admin_private_router.message(FSMAdminFinishOrder.finish_order, F.photo)

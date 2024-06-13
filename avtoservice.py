@@ -51,7 +51,7 @@ async def update_menu():
         if orders_data := await admin_orm.orm_get_order_with_date(session, datetime.combine(today, time(0, 0))):
             text += '🗓 Наряды на сегодня:\n-'
             text += '\n-'.join([(f"<b>{order.begins.hour}:00</b> {order.description}") for order in orders_data])
-        else: text += '🗓 Наряды на сегодня отсутствуют\n'
+        else: text += '\n🗓 Наряды на сегодня отсутствуют\n'
         for _ in range(7):
             calendar_data[f'{ABBREVIATED_WEEK_DAYS[_]}'] = f"|{ABBREVIATED_WEEK_DAYS[_]}|"
         while current_date < last_date:
@@ -65,7 +65,7 @@ async def update_menu():
                     for order in orders_data:
                         hours += (order.ends - order.begins).total_seconds() // 3600
                     if hours < 4: inline_smile = '🟢'
-                    elif hours < 12: inline_smile = '🟡'
+                    elif hours < 14: inline_smile = '🟡'
                     elif hours < 17: inline_smile = '🟠'
                     else: inline_smile = '🔴'
                     text_button = f"{current_date.strftime('%d')}{inline_smile}"
@@ -117,16 +117,16 @@ async def start_utils() -> list[int]:
                 delete_messages = list()
                 for order in nearest_orders:
                     for id in admin_ids:
-                        message = await bot.send_message(
+                        delete_message = await bot.send_message(
                             chat_id=id,
                             text=f'Через час прибудет: {order.description}\nРаспланирована до {order.ends.hour}:00',
                             reply_markup=get_callback_btns(btns=btn, sizes=sizes)
                         )
-                        delete_messages.append(message)
+                        delete_messages.append(delete_message)
                 
                 await asyncio.sleep(3300)
                 try:
-                    for message in delete_messages: message.delete()
+                    for delete_message in delete_messages: await delete_message.delete()
                 except: pass
 
         

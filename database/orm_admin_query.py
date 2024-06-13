@@ -25,6 +25,12 @@ async def orm_add_inline_message_id(session: AsyncSession, tg_id: int, inline_me
         result = await session.execute(query)
         await session.commit()
 
+async def get_admins_menu(session: AsyncSession):
+    query = select(AdminMenu)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
 async def get_inline_message_id(session: AsyncSession, tg_id: int):
     query = select(AdminMenu.inline_message_id).where(tg_id==tg_id)
     result = await session.execute(query)
@@ -309,6 +315,14 @@ async def get_admins_ids(session: AsyncSession):
         ids = result.scalars().all()
     return ids
 
+
+async def add_new_car(session: AsyncSession, client: Client, car_model: str):
+    obj = (Car(id_client=client.id_client, car_model=car_model))
+    session.add(obj)
+    await session.commit()
+    query = select(Car).where(Car.id_client==client.id_client, Car.car_model==car_model)
+    result = await session.execute(query)
+    return result.scalar()
 
 async def get_client_cars(session: AsyncSession, id_client: int, status='actual'):
     query = select(Car).where(Car.id_client==id_client, Car.car_status==status)

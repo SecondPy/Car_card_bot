@@ -82,6 +82,7 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
                 bot.main_admin_menu_ids[message.from_user.id] = main_admin_kb.message_id
                 await admin_orm.orm_add_inline_message_id(session, message.from_user.id, bot.main_admin_menu_ids[message.from_user.id])
 
+    if trigger == 'update_other_admins': return text, calendar_data
     
 
     
