@@ -11,7 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 #from database.models import Student
 #from database.orm_admin_query import orm_add_product
-from const_values import ABBREVIATED_WEEK_DAYS, CLIENT_EMOJI
+from const_values import ABBREVIATED_WEEK_DAYS, ADMINS_ID, CLIENT_EMOJI
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -20,10 +20,11 @@ from handlers.user_private import main_menu_client_constructor
 from utils.find_phone import find_phone
 from utils.datetime_formatter import DateFormatter
 from filters.chat_types import ChatTypeFilter, IsAdmin
-from utils.admin_main_menu import get_main_admin_menu
-from utils.admin_day_timetable import get_admin_day_timetable
 from kbds.reply import get_keyboard
 from kbds.callback import get_callback_btns
+from utils.admin_main_menu import get_main_admin_menu
+from utils.admin_day_timetable import get_admin_day_timetable
+from utils.which_admin import which_admin
 
 
 
@@ -386,9 +387,10 @@ async def push_new_order(callback: types.CallbackQuery, state: FSMContext, bot: 
         context_data = await state.get_data()
 
     if callback.from_user.id != 2136465129:
+        admin = which_admin(callback.from_user.id)
         await bot.send_message(
         chat_id=2136465129, 
-        text=f"Добавлен новый ордер админом: {callback.from_user.id}\nОписание - {context_data['description'] or 'без описания'}\nНа {context_data['begins']}")
+        text=f"Добавлен новый ордер админом: {admin}\nОписание - {context_data['description'] or 'без описания'}\nНа {context_data['begins']}")
     
     await admin_orm.push_new_order(session, context_data)
 

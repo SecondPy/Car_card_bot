@@ -49,7 +49,7 @@ async def get_main_admin_menu(session: AsyncSession, state: FSMContext, bot: Bot
                     inline_smile = (
                         '🟢' if hours < 4 else
                         '🟡' if hours < 12 else
-                        '🟠' if hours < 17 else
+                        '🟠' if hours < 18 else
                         '🔴'
                     )
                     text_button += inline_smile

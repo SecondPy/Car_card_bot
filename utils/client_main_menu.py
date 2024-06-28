@@ -46,7 +46,7 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
             inline_smile = (
                 '🟢' if hours < 4 else
                 '🟡' if hours < 9 else
-                '🟠' if hours < 16 else
+                '🟠' if hours < 18 else
                 '🔴'
             )
             text_button += inline_smile
@@ -55,7 +55,7 @@ async def get_main_client_menu(session: AsyncSession, state: FSMContext, bot: Bo
             calendar_data[f"get_client_day {current_date.strftime('%Y-%m-%d')}"] = text_button
         current_date += timedelta(days=1)
 
-    calendar_data[f"main_menu_client"] = '🏠 Вернутьсяn m  в главное меню 🏠'
+    calendar_data[f"main_menu_client"] = '🏠 Вернуться в главное меню 🏠'
     if trigger == 'cancel':
         main_client_kb = await message.answer(text=f'Все сброшено 👌\n\n{text}', reply_markup=get_callback_btns(btns=calendar_data, sizes=[7]), parse_mode=ParseMode.HTML)
         bot.main_client_menu_ids[message.from_user.id] = main_client_kb.message_id

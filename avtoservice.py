@@ -19,7 +19,7 @@ from middlewares.db import DataBaseSession
 
 
 from database.orm_admin_query import get_inline_message_id
-from const_values import ABBREVIATED_WEEK_DAYS
+from const_values import ABBREVIATED_WEEK_DAYS, MY_TG_ID
 from kbds.callback import get_callback_btns
 
 
@@ -28,7 +28,8 @@ ALLOWED_UPDATES = ['message, edited_message']
 # 6191676658:AAG65LUtn8c7kvpmUNbiuvC-8Qmi9J9H24o - avtoservice_34
 # 6506294620:AAGbP2Bi8VKLSC0UCobcFRKOE3SnxUVD2-k чайная
 # 2102094577:AAHKWVSqsvbU86GC0yvH2CGIZ7s9xY_kp2c - carcardbot
-bot = Bot(token='6191676658:AAG65LUtn8c7kvpmUNbiuvC-8Qmi9J9H24o')
+# 6186073232:AAHPcpmBneJO7VBWoee6AJzhoxmNUh2r2uQ - grishka
+bot = Bot(token='2102094577:AAHKWVSqsvbU86GC0yvH2CGIZ7s9xY_kp2c')
 bot.admins_list = [] # 2136465129 - мой 9965109078
 
 bot.admin_idle_timer, bot.client_idle_timer = dict(), dict()
@@ -42,7 +43,7 @@ dp.include_routers(admin_private_router, client_private_router)
 async def update_menu():
     session, finished_orders_count, admins_menu = await admin_orm.finish_old_orders()
     try:
-        delete = await bot.send_message(2136465129, text=f'Автоматически завершено {finished_orders_count} ордеров')
+        delete = await bot.send_message(MY_TG_ID, text=f'Автоматически завершено {finished_orders_count} ордеров')
         calendar_data = {}
         today = date.today()
         current_date = today - timedelta(days=(today.weekday()))
@@ -83,7 +84,7 @@ async def update_menu():
         await delete.delete()
         await session.close()
     except Exception as e:
-        await bot.send_message(2136465129, text=f'Ошибка при выполнении кода: \n{e}')
+        await bot.send_message(MY_TG_ID, text=f'Ошибка при выполнении кода: \n{e}')
         try: await session.close()
         except: pass
 
@@ -91,6 +92,7 @@ async def update_menu():
 async def start_utils() -> list[int]:
     date_finished_orders = datetime(1900, 1, 1).date()
     answered_hour = 0
+    delete_messages = list()
     while True:
         await asyncio.sleep(5)
         if bot.admin_idle_timer:
@@ -114,7 +116,7 @@ async def start_utils() -> list[int]:
                 btn, sizes = dict(), [1]
                 btn['delete_selected_message'] = '✅ Ок'
                 answered_hour = now.hour
-                delete_messages = list()
+                
                 for order in nearest_orders:
                     for id in admin_ids:
                         delete_message = await bot.send_message(
@@ -125,9 +127,10 @@ async def start_utils() -> list[int]:
                         delete_messages.append(delete_message)
                 
                 await asyncio.sleep(3300)
-                try:
-                    for delete_message in delete_messages: await delete_message.delete()
-                except: pass
+                for delete_message in delete_messages: 
+                    try: await delete_message.delete()
+                    except: pass
+                delete_messages.clear()
 
         
 async def on_startup(bot):

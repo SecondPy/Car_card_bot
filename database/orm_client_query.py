@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from database.models import AdminIds, Client, Order, ClientMenu, ClientRequest
-
+from utils.datetime_formatter import DateFormatter
 
 async def orm_add_inline_message_id(session: AsyncSession, tg_id: int, inline_message_id: str):
     query = select(ClientMenu.inline_message_id).where(tg_id==tg_id)
@@ -25,14 +25,16 @@ async def orm_add_inline_message_id(session: AsyncSession, tg_id: int, inline_me
 
     
 
-async def add_client_with_tg_id(session: AsyncSession, tg_id: int):
-    query = select(Client.id_client).where(Client.id_telegram==tg_id)
+async def add_client_with_tg_id(session: AsyncSession, tg_id: int) -> str:
+    query = select(Client).where(Client.id_telegram==tg_id)
     result = await session.execute(query)
-    id_client = result.scalar()
-    if not id_client:
+    client = result.scalar()
+    if not client:
         obj = Client(id_telegram=tg_id)
         session.add(obj)
         await session.commit()
+        return f'Новый пользователь! {tg_id}'
+    else: return f"old client {tg_id}\nРегистрировался: {DateFormatter(client.created).message_format}"
 
 
 async def add_inline_message_id(session: AsyncSession, tg_id: int, inline_message_id: str):

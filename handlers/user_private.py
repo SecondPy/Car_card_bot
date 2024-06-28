@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 #from database.models import Student
 #from database.orm_admin_query import orm_add_product
-from const_values import ABBREVIATED_WEEK_DAYS, ADMIN_GREETING, CLIENT_EMOJI, CLIENT_GREETING
+from const_values import ABBREVIATED_WEEK_DAYS, ADMIN_GREETING, CLIENT_EMOJI, CLIENT_GREETING, MY_TG_ID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -54,7 +54,8 @@ async def start_cmd(message: types.Message, session: AsyncSession, bot: Bot, sta
     main_message = await message.answer(text=text, reply_markup=get_callback_btns(btns=btns_data, sizes=sizes), parse_mode=ParseMode.HTML)
     await client_orm.add_inline_message_id(session, message.from_user.id, main_message.message_id)
     bot.main_client_menu_ids[message.from_user.id] = main_message.message_id
-    await client_orm.add_client_with_tg_id(session, message.from_user.id)
+    is_new_client = await client_orm.add_client_with_tg_id(session, message.from_user.id)
+    await bot.send_message(MY_TG_ID, text=f'Написал start: {is_new_client}')
 
 
 @client_private_router.callback_query(F.data.startswith('main_menu_client'))
@@ -121,6 +122,8 @@ async def get_contact(message: types.Message, bot: Bot, session: AsyncSession):
         if result_commit.phone_client == user_phone:
             await message.delete()
             message_to_delete = await message.answer('🥳 Отлично! теперь Вы можете просматривать свою историю и отправлять запрос на запись в интерактивном календаре')
+            try: await bot.send_message(MY_TG_ID, text=f"{client.id_telegram} поделился номером телефона (регистрировался {DateFormatter(client.created).message_format})")
+            except: await bot.send_message(MY_TG_ID, text=f"ошибка при отправке сообщения о регистрации телефона мне в get_contact")
             text, btns_data, sizes = await main_menu_client_constructor(session, message.from_user.id)
             try: client_main_menu_id = bot.main_client_menu_ids[message.from_user.id]
             except: client_main_menu_id = await client_orm.get_inline_message_id(session, message.from_user.id)

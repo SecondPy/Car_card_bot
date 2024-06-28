@@ -10,6 +10,7 @@ from aiogram import Bot, F, types
 
 from database import orm_admin_query as admin_orm
 from utils.datetime_formatter import DateFormatter
+from utils.which_admin import which_admin
 from kbds.callback import get_callback_btns
 
 
@@ -45,7 +46,7 @@ async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot
         btn_data[f"weekend_cancel {chosen_day.date()} {is_weekend[0]}"] = "🧑🏼‍🏭 отменить выходной 🧑🏼‍🏭"
         sizes.append(1)
     else:
-        btn_data[f"weekend {chosen_day}"] = "🥳 сделать выходным 🥳"
+        btn_data[f"weekend {chosen_day}"] = "🥳 сделать выходн.ым 🥳"
         sizes.append(1)
 
         while working_hour < work_day_ending:
@@ -72,7 +73,14 @@ async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot
     await message.edit_text(text=message_text, parse_mode=ParseMode.HTML)
     await message.edit_reply_markup(reply_markup=get_callback_btns(btns=btn_data, sizes=sizes))
     
-    if back_to_calendar_after_waiting:
-        await asyncio.sleep(30)
-        if bot.admin_idle_timer[message.from_user.id] > 29:
+    admin = which_admin(message.from_user.id)
+    await bot.send_message(
+        chat_id=2136465129, 
+        text=f"{message_text} \nдля админа: {admin}")
+    
+    while back_to_calendar_after_waiting:
+        await asyncio.sleep(60)
+        if bot.admin_idle_timer[message.from_user.id] > 58:
             await get_main_admin_menu(session=session, state=state, bot=bot, message=message, trigger='button')
+            back_to_calendar_after_waiting = False
+            bot.admin_idle_timer[message.from_user.id] = 0
