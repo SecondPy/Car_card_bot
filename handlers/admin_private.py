@@ -387,7 +387,7 @@ async def push_new_order(callback: types.CallbackQuery, state: FSMContext, bot: 
         context_data = await state.get_data()
 
     if callback.from_user.id != 2136465129:
-        admin = which_admin(callback.from_user.id)
+        admin = await which_admin(callback.from_user.id)
         await bot.send_message(
         chat_id=2136465129, 
         text=f"Добавлен новый ордер админом: {admin}\nОписание - {context_data['description'] or 'без описания'}\nНа {context_data['begins']}")

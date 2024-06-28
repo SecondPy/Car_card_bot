@@ -73,10 +73,11 @@ async def get_admin_day_timetable(message: types.Message, state: FSMContext, bot
     await message.edit_text(text=message_text, parse_mode=ParseMode.HTML)
     await message.edit_reply_markup(reply_markup=get_callback_btns(btns=btn_data, sizes=sizes))
     
-    admin = which_admin(message.from_user.id)
-    await bot.send_message(
-        chat_id=2136465129, 
-        text=f"{message_text} \nдля админа: {admin}")
+    if message.from_user.id not in (2136465129, 2102094577, 6186073232):
+        admin = await which_admin(message.from_user.id)
+        await bot.send_message(
+            chat_id=2136465129, 
+            text=f"{message_text} \nдля админа: {admin}")
     
     while back_to_calendar_after_waiting:
         await asyncio.sleep(60)
